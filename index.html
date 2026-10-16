@@ -1,0 +1,880 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>متابعة المركز</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: job-ticket cards on a cool bench-grey ground, bottom tab bar on phones, bottom-sheet forms. */
+:root{
+  --bg:#E8EDEB; --surface:#FFFFFF; --surface2:#F2F5F4; --ink:#18221F;
+  --muted:#586A65; --line:#D2DAD7; --accent:#0D6A57; --accent-ink:#FFFFFF; --accent-soft:#D4EBE4;
+  --good:#1B7F45; --good-bg:#DBF0E3; --warn:#8F5A06; --warn-bg:#FAE9C8; --crit:#B3302A; --crit-bg:#F8D9D5;
+  --info:#27609F; --info-bg:#DAE7F5; --neutral:#4D5E5A; --neutral-bg:#E2E8E6;
+  --shadow:0 -6px 24px rgba(20,34,30,.14);
+  --f-display:'Reem Kufi','Segoe UI',Tahoma,sans-serif;
+  --f-body:'IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111917; --surface:#19231F; --surface2:#202C28; --ink:#E3ECE8; --muted:#97AAA4; --line:#2D3C37;
+    --accent:#4CC7A4; --accent-ink:#08201A; --accent-soft:#1B3A31;
+    --good:#58D08A; --good-bg:#1B3A29; --warn:#E9B552; --warn-bg:#3D2F12; --crit:#F08177; --crit-bg:#432120;
+    --info:#7DB2EE; --info-bg:#1B2F47; --neutral:#A9BAB5; --neutral-bg:#26332F;
+    --shadow:0 -6px 24px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111917; --surface:#19231F; --surface2:#202C28; --ink:#E3ECE8; --muted:#97AAA4; --line:#2D3C37;
+  --accent:#4CC7A4; --accent-ink:#08201A; --accent-soft:#1B3A31;
+  --good:#58D08A; --good-bg:#1B3A29; --warn:#E9B552; --warn-bg:#3D2F12; --crit:#F08177; --crit-bg:#432120;
+  --info:#7DB2EE; --info-bg:#1B2F47; --neutral:#A9BAB5; --neutral-bg:#26332F;
+  --shadow:0 -6px 24px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+button,input,select,textarea{font:inherit;color:inherit}
+.num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums;display:inline-block}
+.mono{font-family:var(--f-mono);direction:ltr;unicode-bidi:isolate;display:inline-block}
+
+#app{max-width:760px;margin-inline:auto;padding-block:16px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:0}
+.ver{font-family:var(--f-mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+h2{font-family:var(--f-display);font-weight:700;font-size:19px;margin:0 0 10px;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:500;font-size:16px;margin:0 0 8px}
+
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.banner b{font-weight:600}
+.banner .links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.banner .links button{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer}
+
+.tools{display:flex;gap:8px;margin-bottom:10px}
+.search{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:10px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn.soft{background:var(--accent-soft);color:var(--accent)}
+.btn.danger{background:var(--crit-bg);color:var(--crit)}
+.btn.sm{padding:6px 12px;font-size:13px;border-radius:8px}
+.btn:focus-visible,.chip:focus-visible,.tab:focus-visible,.card:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;scrollbar-width:thin}
+.chip{flex:none;background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip .c{font-family:var(--f-mono);font-size:11px;margin-inline-start:5px;opacity:.8}
+
+.list{display:grid;gap:10px}
+.card{display:block;width:100%;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+.card .r{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tag{font-family:var(--f-mono);font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:0 7px;direction:ltr}
+.cust{font-weight:600;font-size:16px;margin-top:6px}
+.sub{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:13px;color:var(--muted)}
+.meta .price{margin-inline-start:auto;color:var(--ink);font-weight:600}
+.stale{margin-top:8px;font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:2px 8px;display:inline-block}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.st-wait{background:var(--neutral-bg);color:var(--neutral)}
+.st-check{background:var(--info-bg);color:var(--info)}
+.st-part{background:var(--warn-bg);color:var(--warn)}
+.st-ready{background:var(--good-bg);color:var(--good)}
+.st-hold{background:var(--crit-bg);color:var(--crit)}
+.st-done{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-family:var(--f-display);font-size:17px;margin-bottom:4px}
+
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.rows{display:grid;gap:0}
+.rows .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.rows .row:last-child{border-bottom:0}
+.rows .row.total{font-weight:600;font-size:17px}
+.good{color:var(--good)} .crit{color:var(--crit)} .muted{color:var(--muted)}
+.seg{display:flex;gap:6px;margin-bottom:10px}
+.seg .chip{flex:1;text-align:center}
+.datebar{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--muted);font-size:14px}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .t{min-width:0;flex:1}
+.item .t b{font-weight:600;overflow-wrap:anywhere}
+.item .t div{font-size:13px;color:var(--muted)}
+.qty{display:flex;align-items:center;gap:8px}
+.qty button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface2);font-size:18px;cursor:pointer}
+.qty .n{font-family:var(--f-mono);min-width:26px;text-align:center;font-weight:500}
+.qual{font-size:12px;border-radius:6px;padding:0 7px;background:var(--surface2);border:1px solid var(--line);color:var(--muted)}
+.low{color:var(--crit)}
+
+form,.form{display:grid;gap:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+label.f input,label.f select,label.f textarea{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:15px;color:var(--ink);min-width:0;width:100%}
+label.f textarea{min-height:70px;resize:vertical}
+label.chk{display:flex;align-items:center;gap:8px;font-size:15px}
+label.chk input{width:20px;height:20px;accent-color:var(--accent)}
+.hint{font-size:12px;color:var(--muted)}
+
+.nav{position:fixed;inset-inline:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+.nav-in{display:flex;width:100%;max-width:760px}
+.tab{flex:1;background:none;border:0;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;color:var(--muted);font-size:12px;cursor:pointer}
+.tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--accent);font-weight:600}
+
+.veil{position:fixed;inset:0;z-index:40;background:rgba(10,18,15,.55);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:94%;overflow-y:auto;border-radius:18px 18px 0 0;box-shadow:var(--shadow);padding-block:16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:700px){.veil{align-items:center}.sheet{border-radius:18px;max-height:90%}}
+.sheet .hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.x{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:18px;line-height:1}
+.toast{position:fixed;inset-inline:0;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;justify-content:center;pointer-events:none}
+.toast span{background:var(--ink);color:var(--bg);border-radius:10px;padding:8px 14px;font-size:14px;max-width:90%}
+.local{background:var(--crit-bg);color:var(--crit);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px}
+@media (max-width:420px){.g2{grid-template-columns:1fr}}
+#login{background:var(--bg)}
+.loginwrap{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:20px}
+.loginwrap .box{width:100%;max-width:380px;margin:0}
+.top .right{display:flex;align-items:center;gap:8px}
+@media (prefers-reduced-motion:no-preference){.card,.chip,.btn{transition:background .12s,border-color .12s}}
+</style>
+
+<div id="app" dir="rtl">
+  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.3</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
+  <div id="localbar"></div>
+  <main id="view"></main>
+</div>
+<nav class="nav" dir="rtl"><div class="nav-in" id="nav"></div></nav>
+<div id="modal"></div>
+<div id="login" hidden></div>
+<div class="toast" id="toast"></div>
+<datalist id="dl-people"></datalist>
+<datalist id="dl-suppliers"></datalist>
+<datalist id="dl-holders"></datalist>
+
+<script>
+(function(){
+document.documentElement.lang='ar'; document.documentElement.dir='rtl';
+
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n||0).toLocaleString('en-US',{maximumFractionDigits:2});
+const money=n=>`<span class="num">${fmt(n)}</span> ج`;
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today=()=>iso(new Date());
+const parse=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,(m||1)-1,d||1)};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
+const dshow=s=>{if(!s)return '—';const [y,m,d]=s.split('-');return `${+d}/${+m}/${y}`};
+const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0};
+function devicesWord(n){return n===1?'جهاز واحد':n===2?'جهازان':n<=10?`${n} أجهزة`:`${n} جهاز`}
+
+const ST=[
+ {k:'wait',l:'في الانتظار',c:'st-wait'},
+ {k:'check',l:'جاري الفحص',c:'st-check'},
+ {k:'part',l:'محتاج قطعة غيار',c:'st-part'},
+ {k:'ready',l:'جاهز للتسليم',c:'st-ready'},
+ {k:'hold',l:'جاهز - في انتظار العميل',c:'st-hold'},
+ {k:'done',l:'تم التسليم',c:'st-done'}
+];
+const STM=Object.fromEntries(ST.map(s=>[s.k,s]));
+const CATS=['شاشة','بطارية','آي سي','فلات شحن','فلات باور','فلات كاميرا','كاميرا','هاوسنج','واير شبكة','أخرى'];
+const QUALS=['أصلي','كوبي','تقليد','غير محدد'];
+const EXPTYPES=['مرتبات','إيجار','كهرباء','إنترنت','مستهلكات (شاي وسكر)','نظافة','أخرى'];
+const METHODS=['نقدي','فودافون كاش','إنستاباي','محفظة أخرى'];
+const DRAWER='الدرج', CWALLET='محفظة المركز';
+
+/* ---------- store (Supabase over plain fetch: no third-party scripts, polling instead of websockets) ---------- */
+const SB_URL='https://afgtgctybsdrbapblejx.supabase.co';
+const SB_KEY='sb_publishable_u59tY8RHzxNSRtlb4CuIeA_k0Tr8RP7';
+const SESSION_KEY='rc_session_v1';
+const POLL_MS=20000;
+const COLS=['devices','inventory','expenses','losses','fin_settings','settings'];
+const cache={}; COLS.forEach(c=>cache[c]=[]);
+let session=null, pollT=null, isAdmin=false, refreshing=null, busy=0;
+
+/* a visible error box, so a script problem never ends as a silent white page */
+let errShown=false;
+function showErr(m){
+  if(errShown)return; errShown=true;
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:#B3302A;color:#fff;padding:8px 12px;font:13px sans-serif;direction:ltr;cursor:pointer';
+  d.textContent='Error: '+m+' (tap to dismiss)'; d.onclick=()=>{d.remove();errShown=false};
+  document.body.appendChild(d);
+}
+window.addEventListener('error',e=>showErr(e.message||'script error'));
+window.addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.message)||String(e.reason)));
+
+const SS={
+  get(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY)||'null') }catch(e){ return null } },
+  set(v){ try{ if(v)localStorage.setItem(SESSION_KEY,JSON.stringify(v)); else localStorage.removeItem(SESSION_KEY) }catch(e){} }
+};
+const newId=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('i'+Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+const stripId=o=>{const {id,...rest}=o||{};return rest};
+
+/* ---------- http ---------- */
+async function http(path,opt){
+  const {method='GET',body,auth=true,headers={}}=opt||{};
+  const h={apikey:SB_KEY,...headers};
+  if(body!==undefined)h['Content-Type']='application/json';
+  if(auth){
+    const t=await accessToken();
+    if(!t){const e=new Error('not signed in');e.code='no_session';throw e}
+    h.Authorization='Bearer '+t;
+  }
+  let res;
+  try{ res=await fetch(SB_URL+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)}); }
+  catch(err){ const e=new Error('network: '+((err&&err.message)||'failed to fetch')); e.code='network'; throw e; }
+  const text=await res.text(); let json=null; try{ json=text?JSON.parse(text):null }catch(e){}
+  if(!res.ok){
+    const e=new Error((json&&(json.message||json.msg||json.error_description||json.error))||('HTTP '+res.status));
+    e.code=String((json&&(json.error_code||json.code))||res.status); e.status=res.status; throw e;
+  }
+  return json;
+}
+function setSession(r){
+  if(!r){ session=null; SS.set(null); return; }
+  const now=Math.floor(Date.now()/1000);
+  session={access_token:r.access_token,refresh_token:r.refresh_token,
+    expires_at:r.expires_at||(now+(Number(r.expires_in)||3600)),
+    user:(r.user&&{id:r.user.id,email:r.user.email})||(session&&session.user)||{}};
+  SS.set(session);
+}
+async function accessToken(){
+  if(!session)return null;
+  const now=Math.floor(Date.now()/1000);
+  if(session.expires_at&&session.expires_at-now>60)return session.access_token;
+  if(!refreshing){
+    refreshing=(async()=>{
+      try{
+        const r=await http('/auth/v1/token?grant_type=refresh_token',{method:'POST',auth:false,body:{refresh_token:session.refresh_token}});
+        setSession(r);
+      }catch(e){
+        if(e.code!=='network'){ setSession(null); handleSignedOut('انتهت الجلسة، سجّل دخول تاني'); }
+        throw e;
+      }finally{ refreshing=null; }
+    })();
+  }
+  try{ await refreshing; }catch(e){ if(e.code==='network'&&session&&session.access_token)return session.access_token; return null; }
+  return session&&session.access_token;
+}
+
+/* ---------- cache ---------- */
+function applyRow(r){
+  if(!r||!cache[r.collection])return;
+  const doc={...(r.data||{}),id:r.id};
+  const i=cache[r.collection].findIndex(x=>x.id===r.id);
+  if(i<0)cache[r.collection].push(doc); else cache[r.collection][i]=doc;
+}
+function dropRow(col,id){ if(cache[col])cache[col]=cache[col].filter(x=>x.id!==id); }
+
+/* ---------- writes (same names the app already uses) ---------- */
+async function put(col,id,data){
+  busy++;
+  try{
+    await http('/rest/v1/docs?on_conflict=collection,id',{method:'POST',body:{collection:col,id,data},headers:{Prefer:'resolution=merge-duplicates,return=minimal'}});
+    applyRow({collection:col,id,data}); renderData();
+  }finally{busy--}
+}
+async function patch(col,id,data){
+  busy++;
+  try{
+    await http('/rest/v1/rpc/patch_doc',{method:'POST',body:{p_collection:col,p_id:id,p_patch:data}});
+    const cur=cache[col].find(x=>x.id===id);
+    applyRow({collection:col,id,data:{...stripId(cur),...data}}); renderData();
+  }finally{busy--}
+}
+async function remove(col,id){
+  busy++;
+  try{
+    const rows=await http('/rest/v1/docs?collection=eq.'+encodeURIComponent(col)+'&id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:{Prefer:'return=representation'}});
+    if(!rows||!rows.length){const e=new Error('not allowed');e.code='42501';throw e}
+    dropRow(col,id); renderData();
+  }finally{busy--}
+}
+async function safe(fn){
+  try{ await fn(); return true; }
+  catch(e){
+    const c=e&&e.code, m=String((e&&e.message)||'');
+    toast(c==='42501'||c==='401'||c==='403'||/not allowed|row-level/i.test(m)?'مفيش صلاحية للعملية دي على الحساب ده'
+      :c==='network'?'مفيش اتصال بالنت، جرب تاني'
+      :'الحفظ ماتمش، جرب تاني');
+    console.warn(e);
+    return false;
+  }
+}
+
+/* ---------- reads: load everything, then poll ---------- */
+function setBar(msg){ const b=$('#localbar'); if(b)b.innerHTML=msg?`<div class="local">${esc(msg)}</div>`:''; }
+async function loadAll(){
+  if(!session||busy>0)return;
+  let all=[],off=0;
+  try{
+    for(;;){
+      const rows=await http('/rest/v1/docs?select=collection,id,data&order=collection.asc,id.asc&limit=1000&offset='+off);
+      all=all.concat(rows||[]); if(!rows||rows.length<1000)break; off+=1000;
+    }
+  }catch(e){
+    if(e.code==='no_session')return;
+    setBar(e.code==='network'?'مفيش اتصال بالنت. البيانات اللي قدامك ممكن تكون قديمة.':'مش قادر أحمّل البيانات. اتأكد إن كود الإعداد اتنفذ في Supabase.');
+    console.warn(e); return;
+  }
+  if(busy>0)return;
+  setBar('');
+  COLS.forEach(c=>cache[c]=[]); all.forEach(applyRow); renderData();
+}
+function startPoll(){ stopPoll(); pollT=setInterval(()=>{ if(!document.hidden)loadAll(); },POLL_MS); }
+function stopPoll(){ if(pollT){clearInterval(pollT);pollT=null} }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&session)loadAll(); });
+
+/* ---------- auth: login screen, account sheet ---------- */
+function handleSignedOut(msg){
+  stopPoll(); COLS.forEach(c=>cache[c]=[]); isAdmin=false; if(S.modal)closeModal();
+  showLogin(msg);
+}
+function showLogin(msg){
+  $('#app').hidden=true; $('.nav').hidden=true;
+  const L=$('#login'); L.hidden=false;
+  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:4px">متابعة المركز</div><div class="muted" style="margin-bottom:14px">سجّل دخولك بالإيميل والباسورد اللي اتعملولك</div>
+   <form class="form" id="loginform" autocomplete="on">
+    ${field('الإيميل','<input id="l-email" type="email" name="email" autocomplete="username" dir="ltr" inputmode="email" required>')}
+    ${field('الباسورد','<input id="l-pass" type="password" name="password" autocomplete="current-password" dir="ltr" required>')}
+    <div id="loginerr" class="hint crit" role="alert">${esc(msg||'')}</div>
+    <button class="btn" type="submit" id="loginbtn">دخول</button></form></div></div>`;
+  $('#loginform').addEventListener('submit',doLogin);
+  setTimeout(()=>{const e=$('#l-email'); if(e)e.focus()},50);
+}
+async function doLogin(e){
+  e.preventDefault();
+  const btn=$('#loginbtn'), err=$('#loginerr'); err.textContent='';
+  const email=$('#l-email').value.trim().toLowerCase(), password=$('#l-pass').value;
+  if(!email||!password)return;
+  btn.disabled=true; btn.textContent='جاري الدخول...';
+  const fail=m=>{err.textContent=m;btn.disabled=false;btn.textContent='دخول'};
+  try{
+    const r=await http('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email,password}});
+    setSession(r); await startApp();
+  }catch(ex){
+    console.warn(ex);
+    fail(ex.code==='network'?'مقدرتش أتصل بقاعدة البيانات. اتأكد من النت وجرب تاني.'
+      :ex.code==='email_not_confirmed'?'الحساب ده لسه مش مفعّل في Supabase.'
+      :(ex.code==='invalid_credentials'||ex.status===400||ex.status===401)?'الإيميل أو الباسورد غلط'
+      :'حصلت مشكلة ('+(ex.message||ex.code)+')');
+  }
+}
+async function startApp(){
+  const L=$('#login'); L.hidden=true; L.innerHTML='';
+  $('#app').hidden=false; $('.nav').hidden=false;
+  try{ const r=await http('/rest/v1/rpc/is_admin',{method:'POST',body:{}}); isAdmin=(r===true); }
+  catch(e){ isAdmin=false; console.warn(e); if(e.code==='network')setBar('مفيش اتصال بالنت.'); }
+  if(!isAdmin&&(S.tab==='money'||S.tab==='set'))S.tab='devices';
+  renderTab(); loadAll(); startPoll();
+}
+function openAccount(){
+  S.modal={type:'account'};
+  const email=(session&&session.user&&session.user.email)||'';
+  showModal(`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>حسابي</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
+   <div class="box"><div class="rows"><div class="row"><span>الإيميل</span><span class="mono">${esc(email)}</span></div><div class="row"><span>الصلاحية</span><span>${isAdmin?'مدير':'فريق'}</span></div></div></div>
+   <h3>تغيير الباسورد</h3>
+   <form class="form" id="pwform" autocomplete="off">
+    ${field('الباسورد الحالي','<input id="pw-old" type="password" autocomplete="current-password" dir="ltr" required>')}
+    ${field('الباسورد الجديد (6 على الأقل)','<input id="pw-new" type="password" autocomplete="new-password" dir="ltr" minlength="6" required>')}
+    ${field('أكد الباسورد الجديد','<input id="pw-new2" type="password" autocomplete="new-password" dir="ltr" minlength="6" required>')}
+    <button class="btn" type="submit">حفظ الباسورد الجديد</button></form>
+   <button class="btn danger" data-act="logout" style="width:100%;margin-top:14px">تسجيل خروج</button></div>`);
+  $('#pwform').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const o=$('#pw-old').value, n=$('#pw-new').value, n2=$('#pw-new2').value;
+    if(n.length<6){toast('الباسورد الجديد لازم يكون 6 على الأقل');return}
+    if(n!==n2){toast('الباسورد الجديد مش متطابق');return}
+    if(n===o){toast('اختار باسورد مختلف عن القديم');return}
+    try{
+      try{ const r=await http('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email,password:o}}); setSession(r); }
+      catch(ex){ if(ex.code==='network')throw ex; toast('الباسورد الحالي غلط'); return; }
+      await http('/auth/v1/user',{method:'PUT',body:{password:n}});
+      closeModal(); toast('اتغير الباسورد');
+    }catch(ex){
+      console.warn(ex);
+      toast(ex.code==='network'?'مفيش اتصال بالنت، جرب تاني'
+        :ex.code==='weak_password'?'الباسورد ضعيف، اختار أقوى'
+        :ex.code==='same_password'?'اختار باسورد مختلف عن القديم'
+        :'التغيير ماتمش، جرب تاني');
+    }
+  });
+}
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  if(b.dataset.act==='account'){openAccount();return}
+  if(b.dataset.act==='logout'){
+    try{ await http('/auth/v1/logout?scope=local',{method:'POST',body:{}}); }catch(x){}
+    setSession(null); handleSignedOut();
+  }
+});
+async function boot(){
+  session=SS.get();
+  if(session&&session.refresh_token){
+    try{ const t=await accessToken(); if(t){ await startApp(); return; } }catch(e){ console.warn(e); }
+  }
+  showLogin();
+}
+
+/* ---------- derived data ---------- */
+const settings=()=>cache.settings.find(x=>x.id==='main')||{};
+const finSettings=()=>cache.fin_settings.find(x=>x.id==='main')||{};
+const alertDays=()=>{const n=Number(settings().alertDays);return n>0?n:7};
+const teamNames=()=>settings().team||[];
+const devs=()=>cache.devices;
+const partCost=d=>(d.parts||[]).reduce((s,p)=>s+num(p.price)+num(p.shipping),0);
+const paidOf=d=>(d.payments||[]).reduce((s,p)=>s+num(p.amount),0);
+const linkedLoss=d=>cache.losses.filter(l=>l.deviceId===d.id).reduce((s,l)=>s+num(l.amount),0);
+function isStale(d){ if(d.status==='done')return false; const t=d.statusAt||d.createdAt||0; return t&&(Date.now()-t)/864e5>=alertDays(); }
+function staleDays(d){return Math.floor((Date.now()-(d.statusAt||d.createdAt||Date.now()))/864e5)}
+function people(){ const s=new Set(teamNames()); devs().forEach(d=>{if(d.receiver)s.add(d.receiver);if(d.tech)s.add(d.tech);(d.payments||[]).forEach(p=>{if(p.receivedBy)s.add(p.receivedBy)})}); return [...s]; }
+function suppliers(){ const s=new Set(); devs().forEach(d=>(d.parts||[]).forEach(p=>p.supplier&&s.add(p.supplier))); cache.inventory.forEach(i=>i.supplier&&s.add(i.supplier)); return [...s]; }
+function refreshLists(){
+  $('#dl-people').innerHTML=people().map(p=>`<option value="${esc(p)}">`).join('');
+  $('#dl-suppliers').innerHTML=suppliers().map(p=>`<option value="${esc(p)}">`).join('');
+  $('#dl-holders').innerHTML=[DRAWER,CWALLET,...people()].map(p=>`<option value="${esc(p)}">`).join('');
+}
+
+/* ---------- ui state ---------- */
+const S={tab:'devices',filter:'all',q:'',period:'day',ref:today(),modal:null};
+
+function toast(msg){
+  const t=$('#toast'); t.innerHTML=`<span>${esc(msg)}</span>`;
+  clearTimeout(toast.t); toast.t=setTimeout(()=>t.innerHTML='',2600);
+}
+function armConfirm(btn,fn){
+  if(btn.dataset.armed){fn();return}
+  const old=btn.textContent; btn.dataset.armed='1'; btn.textContent='اضغط تاني للتأكيد';
+  setTimeout(()=>{ if(btn.isConnected){delete btn.dataset.armed;btn.textContent=old} },3000);
+}
+
+/* ---------- nav ---------- */
+const ICONS={
+ devices:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+ stock:'<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+ money:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 14.5h2"/>',
+ set:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/>'
+};
+function buildNav(){
+  const items=[['devices','الأجهزة'],['stock','المخزون']];
+  if(isAdmin){items.push(['money','الحسابات']);items.push(['set','الإعدادات'])}
+  $('#nav').innerHTML=items.map(([k,l])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}</button>`).join('');
+}
+
+/* ---------- tabs ---------- */
+function renderTab(){
+  buildNav(); refreshLists();
+  const v=$('#view');
+  if(S.tab==='devices'){
+    v.innerHTML=`<div id="alerts"></div>
+      <div class="tools"><input class="search" id="q" type="search" placeholder="دور بالاسم أو الموديل أو الرقم" value="${esc(S.q)}"><button class="btn" data-act="new-dev">+ جهاز</button></div>
+      <div class="chips" id="chips"></div><div class="list" id="devlist"></div>`;
+  } else if(S.tab==='stock'){
+    v.innerHTML=`<div class="tools"><input class="search" id="sq" type="search" placeholder="دور في المخزون"><button class="btn" data-act="new-item">+ قطعة</button></div>
+      <div class="chips" id="cchips"></div><div id="stocksum"></div><div class="box" id="stocklist"></div>`;
+  } else if(S.tab==='money'){
+    v.innerHTML=`<div class="seg" id="seg"></div>
+      <div class="datebar"><span>التاريخ المرجعي</span><input class="search" id="ref" type="date" style="flex:none" value="${S.ref}"></div>
+      <div id="report"></div><div id="balance"></div><div id="exps"></div><div id="losses"></div>`;
+  } else {
+    v.innerHTML='<div id="settingsBox"></div>';
+  }
+  renderData();
+}
+function renderData(){
+  if(!$('#view'))return;
+  refreshLists();
+  if(S.tab==='devices'){renderAlerts();renderChips();renderDevList();}
+  else if(S.tab==='stock'){renderStock();}
+  else if(S.tab==='money'){renderMoney();}
+  else renderSettings();
+  if(S.modal&&S.modal.type==='device'&&S.modal.id)refreshDeviceSections();
+}
+
+/* ----- devices ----- */
+function renderAlerts(){
+  const st=devs().filter(isStale);
+  $('#alerts').innerHTML=st.length?`<div class="banner"><b>${devicesWord(st.length)}</b> من غير تحديث بقاله ${alertDays()} يوم أو أكتر.
+    <div class="links">${st.slice(0,8).map(d=>`<button data-act="open-dev" data-id="${esc(d.id)}">${esc(d.customer||'بدون اسم')} · ${esc(d.model||'')}</button>`).join('')}</div></div>`:'';
+}
+function filtered(){
+  const q=S.q.trim().toLowerCase();
+  return devs().filter(d=>{
+    if(S.filter==='stale'&&!isStale(d))return false;
+    if(S.filter!=='all'&&S.filter!=='stale'&&d.status!==S.filter)return false;
+    if(!q)return true;
+    return [d.customer,d.phone,d.model,d.imei,d.issue,String(d.no||'')].some(x=>String(x||'').toLowerCase().includes(q));
+  }).sort((a,b)=>((a.status==='done')-(b.status==='done'))||((b.createdAt||0)-(a.createdAt||0)));
+}
+function renderChips(){
+  const cnt=k=>k==='all'?devs().length:k==='stale'?devs().filter(isStale).length:devs().filter(d=>d.status===k).length;
+  const all=[{k:'all',l:'الكل'},...ST,{k:'stale',l:'متأخر'}];
+  $('#chips').innerHTML=all.map(s=>`<button class="chip ${S.filter===s.k?'on':''}" data-filter="${s.k}">${s.l}<span class="c">${cnt(s.k)}</span></button>`).join('');
+}
+function devCard(d){
+  const st=STM[d.status]||STM.wait;
+  return `<button class="card" data-act="open-dev" data-id="${esc(d.id)}">
+    <div class="r"><span class="tag">#${String(d.no||0).padStart(4,'0')}</span><span class="pill ${st.c}">${st.l}</span></div>
+    <div class="cust">${esc(d.customer||'بدون اسم')}</div>
+    <div class="sub">${esc(d.model||'')}${d.issue?' · '+esc(d.issue):''}</div>
+    <div class="meta"><span>التسليم: ${esc(d.due||'—')}</span><span>الفني: ${esc(d.tech||'—')}</span><span class="price">${money(d.price)}</span></div>
+    ${isStale(d)?`<div class="stale">من ${staleDays(d)} يوم من غير تحديث</div>`:''}
+  </button>`;
+}
+function renderDevList(){
+  const l=filtered();
+  $('#devlist').innerHTML=l.length?l.map(devCard).join(''):
+   (devs().length?`<div class="empty"><b>مفيش نتايج</b>غيّر الفلتر أو كلمة البحث.</div>`:
+   `<div class="empty"><b>مفيش أجهزة لسه</b>اضغط "+ جهاز" وسجل أول جهاز داخل المركز. هيظهر عند كل التيم في نفس اللحظة.</div>`);
+}
+
+/* ----- device sheet ----- */
+function field(label,inner){return `<label class="f">${label}${inner}</label>`}
+function openDevice(id){
+  const d=id?devs().find(x=>x.id===id):null;
+  S.modal={type:'device',id:id||null};
+  const v=d||{entryDate:today()};
+  const html=`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>${d?`جهاز #${String(d.no||0).padStart(4,'0')}`:'جهاز جديد'}</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
+   <form class="form" id="devform" autocomplete="off">
+    <div class="g2">${field('اسم العميل',`<input id="f-customer" value="${esc(v.customer)}" required>`)}${field('رقم التليفون',`<input id="f-phone" type="tel" inputmode="tel" dir="ltr" value="${esc(v.phone)}">`)}</div>
+    <div class="g2">${field('نوع الجهاز',`<input id="f-model" value="${esc(v.model)}" placeholder="مثال: Redmi A1 Plus">`)}${field('السيريال / IMEI (اختياري)',`<input id="f-imei" class="mono" inputmode="numeric" dir="ltr" value="${esc(v.imei)}">`)}</div>
+    ${field('العطل المذكور',`<textarea id="f-issue">${esc(v.issue)}</textarea>`)}
+    <div class="g2">${field('اسم المستلم',`<input id="f-receiver" list="dl-people" value="${esc(v.receiver)}">`)}${field('الفني المسؤول',`<input id="f-tech" list="dl-people" value="${esc(v.tech)}">`)}</div>
+    <div class="g2">${field('تاريخ الدخول',`<input id="f-entry" type="date" value="${esc(v.entryDate||today())}">`)}${field('معاد التسليم المتفق عليه',`<input id="f-due" value="${esc(v.due)}" placeholder="بعد ساعتين / بكرة / بعد يومين">`)}</div>
+    ${field('المبلغ المتفق عليه (ج)',`<input id="f-price" type="number" inputmode="decimal" step="any" min="0" value="${v.price??''}">`)}
+    ${field('ملاحظات',`<textarea id="f-notes" placeholder="أي حاجة تلاقيها وقت الفحص">${esc(v.notes)}</textarea>`)}
+    <button class="btn" type="submit">${d?'حفظ التعديلات':'تسجيل الجهاز'}</button>
+   </form>
+   <div id="devExtra"></div></div>`;
+  showModal(html);
+  $('#devform').addEventListener('submit',e=>{e.preventDefault();saveDevice();});
+  refreshDeviceSections();
+}
+async function saveDevice(){
+  const g=i=>$('#'+i).value.trim();
+  const base={customer:g('f-customer'),phone:g('f-phone'),model:g('f-model'),imei:g('f-imei'),issue:g('f-issue'),receiver:g('f-receiver'),tech:g('f-tech'),entryDate:g('f-entry')||today(),due:g('f-due'),price:num($('#f-price').value),notes:g('f-notes')};
+  if(!base.customer){toast('اكتب اسم العميل');return}
+  const id=S.modal.id;
+  if(id){
+    if(await safe(()=>patch('devices',id,base))){toast('اتحفظ');}
+  }else{
+    const no=devs().reduce((m,d)=>Math.max(m,d.no||0),0)+1;
+    const nid=newId('devices');
+    const now=Date.now();
+    const ok=await safe(()=>put('devices',nid,{...base,no,status:'wait',createdAt:now,statusAt:now,deliveredAt:'',parts:[],payments:[],warranty:{on:false,months:0,start:''}}));
+    if(ok){toast('اتسجل الجهاز'); S.modal={type:'device',id:nid}; openDevice(nid);}
+  }
+}
+function devSummary(d){
+  const cost=partCost(d), loss=linkedLoss(d), paid=paidOf(d);
+  const profit=num(d.price)-cost-loss;
+  return `<div class="box"><div class="rows">
+   <div class="row"><span>المبلغ المتفق عليه</span><span>${money(d.price)}</span></div>
+   <div class="row"><span>اتدفع</span><span>${money(paid)}</span></div>
+   <div class="row"><span>المتبقي على العميل</span><span class="${num(d.price)-paid>0?'crit':'good'}">${money(num(d.price)-paid)}</span></div>
+   <div class="row"><span>تكلفة القطع والشحن</span><span>${money(cost)}</span></div>
+   ${isAdmin?`${loss?`<div class="row"><span>خسائر صيانة على الجهاز</span><span class="crit">${money(loss)}</span></div>`:''}
+   <div class="row total"><span>ربح الجهاز</span><span class="${profit>=0?'good':'crit'}">${money(profit)}</span></div>`:''}
+  </div></div>`;
+}
+function refreshDeviceSections(){
+  const box=$('#devExtra'); if(!box||!S.modal||!S.modal.id)return;
+  const d=devs().find(x=>x.id===S.modal.id); if(!d){return}
+  const w=d.warranty||{};
+  const wstart=w.start||d.deliveredAt||'';
+  let wend='';
+  if(w.on&&w.months&&wstart){const e=parse(wstart);e.setMonth(e.getMonth()+Number(w.months));wend=iso(e)}
+  const keep=document.activeElement&&box.contains(document.activeElement)?document.activeElement.id:'';
+  const stock=cache.inventory.filter(i=>num(i.qty)>0);
+  box.innerHTML=`
+   ${d.status!=='done'?`<button class="btn" data-act="deliver" data-id="${esc(d.id)}" style="width:100%;margin-bottom:12px;padding:14px;font-size:16px">تم التسليم</button>`:`<div class="banner" style="background:var(--good-bg);color:var(--good)"><b>تم التسليم</b> يوم ${dshow(d.deliveredAt)}</div>`}
+   <h3>حالة الجهاز</h3>
+   <div class="chips" style="flex-wrap:wrap;overflow:visible">${ST.map(s=>`<button class="chip ${d.status===s.k?'on':''}" data-act="set-status" data-k="${s.k}">${s.l}</button>`).join('')}</div>
+   ${devSummary(d)}
+   <h3>الضمان</h3>
+   <div class="box form">
+    <label class="chk"><input type="checkbox" id="w-on" ${w.on?'checked':''}> عليه ضمان</label>
+    ${w.on?`<div class="g2">${field('المدة بالشهور',`<input id="w-m" type="number" inputmode="numeric" min="1" value="${w.months||''}">`)}${field('بداية الضمان',`<input id="w-s" type="date" value="${esc(w.start||'')}">`)}</div>
+    <div class="hint">${wstart?`البداية ${dshow(wstart)}${wend?` · ينتهي ${dshow(wend)}`:''}`:'لو سبت البداية فاضية هتتحسب من تاريخ التسليم'}</div>`:''}
+   </div>
+   <h3>قطع الغيار</h3>
+   <div class="box">
+    ${(d.parts||[]).length?`<div>${d.parts.map(p=>`<div class="item"><div class="t"><b>${esc(p.name)}</b><div>${p.fromStock?'من المخزون':esc(p.supplier||'بدون تاجر')} · ${money(num(p.price))}${num(p.shipping)?` + شحن ${money(p.shipping)}`:''}</div></div><button class="btn sm danger" data-act="del-part" data-pid="${esc(p.id)}">حذف</button></div>`).join('')}</div>`:'<div class="hint" style="margin-bottom:8px">لسه ماتضافتش قطع على الجهاز ده.</div>'}
+    <div class="form" style="margin-top:10px">
+     <div class="g2">${field('اسم القطعة','<input id="p-name" placeholder="شاشة / بطارية / آي سي">')}${field('التاجر','<input id="p-sup" list="dl-suppliers">')}</div>
+     <div class="g2">${field('السعر (ج)','<input id="p-price" type="number" inputmode="decimal" step="any" min="0">')}${field('الشحن / المواصلات (ج)','<input id="p-ship" type="number" inputmode="decimal" step="any" min="0">')}</div>
+     <button class="btn soft" data-act="add-part">إضافة قطعة اشتريتها</button>
+     ${stock.length?`<div class="g2" style="align-items:end">${field('أو خد من المخزون',`<select id="p-stock">${stock.map(i=>`<option value="${esc(i.id)}">${esc(i.name)}${i.model?' - '+esc(i.model):''} (${i.qty})</option>`).join('')}</select>`)}<button class="btn ghost" data-act="add-stock-part">استخدم من المخزون</button></div>`:''}
+    </div>
+   </div>
+   <h3>الدفع</h3>
+   <div class="box">
+    ${(d.payments||[]).length?`<div>${d.payments.map(p=>`<div class="item"><div class="t"><b>${money(p.amount)}</b><div>${esc(p.method)} · استلمها ${esc(p.receivedBy||'—')} · الفلوس عند ${esc(p.holder||DRAWER)} · ${dshow(p.date)}</div></div><button class="btn sm danger" data-act="del-pay" data-pid="${esc(p.id)}">حذف</button></div>`).join('')}</div>`:'<div class="hint" style="margin-bottom:8px">مفيش دفعات متسجلة.</div>'}
+    <div class="form" style="margin-top:10px">
+     <div class="g2">${field('المبلغ (ج)',`<input id="y-amt" type="number" inputmode="decimal" step="any" min="0" value="${Math.max(0,num(d.price)-paidOf(d))||''}">`)}${field('طريقة الدفع',`<select id="y-method">${METHODS.map(m=>`<option>${m}</option>`).join('')}</select>`)}</div>
+     <div class="g2">${field('مين استلم الفلوس','<input id="y-by" list="dl-people">')}${field('الفلوس دلوقتي عند / على محفظة مين',`<input id="y-holder" list="dl-holders" value="${DRAWER}">`)}</div>
+     <button class="btn soft" data-act="add-pay">تسجيل دفعة</button>
+    </div>
+   </div>
+   <button class="btn danger" data-act="del-dev" style="width:100%">حذف الجهاز</button>`;
+  if(keep){const el=document.getElementById(keep);if(el)el.focus()}
+}
+async function devPatch(id,data){return safe(()=>patch('devices',id,data))}
+const curDev=()=>devs().find(x=>x.id===(S.modal&&S.modal.id));
+
+/* ----- stock ----- */
+function renderStock(){
+  const q=($('#sq')&&$('#sq').value||'').trim().toLowerCase();
+  const catSel=S.cat||'all';
+  const items=cache.inventory;
+  const cats=['all',...CATS.filter(c=>items.some(i=>i.category===c))];
+  $('#cchips').innerHTML=cats.map(c=>`<button class="chip ${catSel===c?'on':''}" data-cat="${esc(c)}">${c==='all'?'الكل':esc(c)}</button>`).join('');
+  const value=items.reduce((s,i)=>s+num(i.qty)*num(i.buyPrice),0);
+  const pieces=items.reduce((s,i)=>s+num(i.qty),0);
+  $('#stocksum').innerHTML=items.length?`<div class="box"><div class="rows"><div class="row"><span>عدد القطع المتاحة</span><span class="num">${fmt(pieces)}</span></div><div class="row"><span>قيمة المخزون بسعر الشراء</span><span>${money(value)}</span></div></div></div>`:'';
+  const l=items.filter(i=>(catSel==='all'||i.category===catSel)&&(!q||[i.name,i.model,i.category,i.supplier,i.quality].some(x=>String(x||'').toLowerCase().includes(q))))
+    .sort((a,b)=>String(a.category||'').localeCompare(String(b.category||''),'ar')||String(a.name||'').localeCompare(String(b.name||''),'ar'));
+  $('#stocklist').innerHTML=l.length?l.map(i=>`<div class="item"><button class="t" data-act="open-item" data-id="${esc(i.id)}" style="background:none;border:0;text-align:start;padding:0;cursor:pointer"><b>${esc(i.name)}</b> <span class="qual">${esc(i.quality||'غير محدد')}</span><div>${esc(i.category||'')}${i.model?' · '+esc(i.model):''}${i.supplier?' · '+esc(i.supplier):''} · ${money(i.buyPrice)}</div></button>
+    <div class="qty"><button data-act="qty-minus" data-id="${esc(i.id)}" aria-label="نقص">−</button><span class="n ${num(i.qty)<=0?'low':''}">${num(i.qty)}</span><button data-act="qty-plus" data-id="${esc(i.id)}" aria-label="زوّد">+</button></div></div>`).join(''):
+   `<div class="empty" style="border:0"><b>${items.length?'مفيش نتايج':'المخزون فاضي'}</b>${items.length?'جرب كلمة تانية.':'ضيف أي قطعة غيار عندك (شاشات، آي سيهات، فلاتات، هاوسنج...) عشان تعرف قبل ما تشتري إنها موجودة.'}</div>`;
+}
+function openItem(id){
+  const i=id?cache.inventory.find(x=>x.id===id):null;
+  S.modal={type:'item',id:id||null};
+  const v=i||{qty:1,category:'شاشة',quality:'أصلي'};
+  showModal(`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>${i?'تعديل قطعة':'قطعة جديدة'}</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
+   <form class="form" id="itemform" autocomplete="off">
+    ${field('اسم القطعة',`<input id="i-name" value="${esc(v.name)}" placeholder="مثال: شاشة / IC شحن U2" required>`)}
+    <div class="g2">${field('النوع',`<select id="i-cat">${CATS.map(c=>`<option ${v.category===c?'selected':''}>${c}</option>`).join('')}</select>`)}${field('الجودة',`<select id="i-q">${QUALS.map(c=>`<option ${v.quality===c?'selected':''}>${c}</option>`).join('')}</select>`)}</div>
+    ${field('الموديل المتوافق',`<input id="i-model" value="${esc(v.model)}" placeholder="مثال: Redmi A1 Plus">`)}
+    <div class="g2">${field(i?'الكمية الحالية':'الكمية',`<input id="i-qty" type="number" inputmode="numeric" min="0" value="${v.qty??0}">`)}${field('سعر الشراء للقطعة (ج)',`<input id="i-price" type="number" inputmode="decimal" step="any" min="0" value="${v.buyPrice??''}">`)}</div>
+    ${field('التاجر',`<input id="i-sup" list="dl-suppliers" value="${esc(v.supplier)}">`)}
+    ${i?field('اشتريت كمية جديدة؟ اكتب عددها',`<input id="i-add" type="number" inputmode="numeric" min="0" placeholder="0">`)+'<div class="hint">الكمية الجديدة بتتضاف على الكمية الحالية وبتتحسب مصروف بسعر الشراء اللي فوق.</div>':''}
+    <button class="btn" type="submit">حفظ</button>
+    ${i?'<button class="btn danger" type="button" data-act="del-item">حذف القطعة</button>':''}
+   </form></div>`);
+  $('#itemform').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const g=k=>$('#'+k).value.trim();
+    if(!g('i-name')){toast('اكتب اسم القطعة');return}
+    let qty=num($('#i-qty').value), price=num($('#i-price').value);
+    const data={name:g('i-name'),category:$('#i-cat').value,quality:$('#i-q').value,model:g('i-model'),supplier:g('i-sup'),buyPrice:price};
+    if(i){
+      const add=$('#i-add')?num($('#i-add').value):0;
+      qty+=add; data.qty=qty; data.spent=num(i.spent)+add*price;
+      if(await safe(()=>patch('inventory',i.id,data))){closeModal();toast('اتحفظ')}
+    }else{
+      data.qty=qty; data.spent=qty*price; data.createdAt=Date.now();
+      if(await safe(()=>put('inventory',newId('inventory'),data))){closeModal();toast('اتضافت للمخزون')}
+    }
+  });
+}
+
+/* ----- money ----- */
+function range(){
+  const r=S.ref;
+  if(S.period==='day')return {from:r,to:r,label:`اليوم ${dshow(r)}`};
+  if(S.period==='week'){const back=(parse(r).getDay()+1)%7;const f=addDays(r,-back);const t=addDays(f,6);return {from:f,to:t,label:`الأسبوع من ${dshow(f)} إلى ${dshow(t)}`}}
+  const d=parse(r);const f=iso(new Date(d.getFullYear(),d.getMonth(),1));const t=iso(new Date(d.getFullYear(),d.getMonth()+1,0));
+  return {from:f,to:t,label:`شهر ${MONTHS[d.getMonth()]} ${d.getFullYear()}`};
+}
+const inR=(x,R)=>x&&x>=R.from&&x<=R.to;
+function renderMoney(){
+  $('#seg').innerHTML=[['day','يومي'],['week','أسبوعي'],['month','شهري']].map(([k,l])=>`<button class="chip ${S.period===k?'on':''}" data-period="${k}">${l}</button>`).join('');
+  const R=range();
+  const done=devs().filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
+  const revenue=done.reduce((s,d)=>s+num(d.price),0);
+  const costs=done.reduce((s,d)=>s+partCost(d),0);
+  const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0);
+  const expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
+  const net=revenue-costs-lossP-expP;
+  const pendingDeliver=devs().filter(d=>d.status!=='done'&&num(d.price)>0&&paidOf(d)>=num(d.price));
+  const collected=devs().reduce((s,d)=>s+(d.payments||[]).filter(p=>inR(p.date,R)).reduce((a,p)=>a+num(p.amount),0),0);
+  $('#report').innerHTML=`<div class="box"><h2>${esc(R.label)}</h2><div class="rows">
+    <div class="row"><span>إيراد ${devicesWord(done.length)} اتسلموا</span><span>${money(revenue)}</span></div>
+    <div class="row"><span>قطع الغيار والشحن</span><span class="crit">− ${money(costs)}</span></div>
+    <div class="row"><span>خسائر صيانة</span><span class="crit">− ${money(lossP)}</span></div>
+    <div class="row"><span>مصاريف تشغيلية</span><span class="crit">− ${money(expP)}</span></div>
+    <div class="row total"><span>صافي الربح</span><span class="${net>=0?'good':'crit'}">${money(net)}</span></div>
+    <div class="row"><span class="muted">اتقبض فعليًا في الفترة</span><span class="muted">${money(collected)}</span></div>
+   </div>
+   ${pendingDeliver.length?`<div class="banner" style="margin-top:12px"><b>${devicesWord(pendingDeliver.length)}</b> اتدفع تمنهم كامل ولسه مش متسجلين "تم التسليم"، عشان كده مش داخلين في الربح.
+     <div class="links">${pendingDeliver.slice(0,10).map(d=>`<button data-act="deliver" data-id="${esc(d.id)}">${esc(d.customer||'بدون اسم')} · ${esc(d.model||'')} ← تم التسليم</button>`).join('')}</div></div>`:''}
+   ${done.length?`<h3 style="margin-top:14px">ربح كل جهاز (الإيراد − القطع)</h3>${done.map(d=>`<div class="item"><div class="t"><b>${esc(d.customer||'بدون اسم')}</b><div>${esc(d.model||'')} · #${String(d.no||0).padStart(4,'0')}</div></div><span class="${num(d.price)-partCost(d)>=0?'good':'crit'}">${money(num(d.price)-partCost(d))}</span></div>`).join('')}`:'<div class="hint" style="margin-top:10px">الربح بيتحسب من الأجهزة اللي حالتها "تم التسليم" وتاريخ تسليمها في الفترة دي.</div>'}</div>`;
+
+  const opening=num(finSettings().opening);
+  const collectedAll=devs().reduce((s,d)=>s+paidOf(d),0);
+  const partsDirect=devs().reduce((s,d)=>s+(d.parts||[]).filter(p=>!p.fromStock).reduce((a,p)=>a+num(p.price)+num(p.shipping),0),0);
+  const stockSpent=cache.inventory.reduce((s,i)=>s+num(i.spent),0);
+  const expAll=cache.expenses.reduce((s,e)=>s+num(e.amount),0);
+  const lossAll=cache.losses.reduce((s,e)=>s+num(e.amount),0);
+  const balance=opening+collectedAll-partsDirect-stockSpent-expAll-lossAll;
+  const hold={};
+  devs().forEach(d=>(d.payments||[]).forEach(p=>{const h=p.holder||DRAWER;hold[h]=(hold[h]||0)+num(p.amount)}));
+  const holders=Object.entries(hold).sort((a,b)=>b[1]-a[1]);
+  $('#balance').innerHTML=`<div class="box"><h2>رصيد المكان</h2><div class="rows">
+    <div class="row"><span>رصيد بداية</span><span>${money(opening)}</span></div>
+    <div class="row"><span>كل اللي اتقبض من العملاء</span><span>${money(collectedAll)}</span></div>
+    <div class="row"><span>قطع غيار وشحن لأجهزة</span><span class="crit">− ${money(partsDirect)}</span></div>
+    <div class="row"><span>مشتريات مخزون</span><span class="crit">− ${money(stockSpent)}</span></div>
+    <div class="row"><span>مصاريف تشغيلية</span><span class="crit">− ${money(expAll)}</span></div>
+    <div class="row"><span>خسائر صيانة</span><span class="crit">− ${money(lossAll)}</span></div>
+    <div class="row total"><span>الرصيد الحالي</span><span class="${balance>=0?'good':'crit'}">${money(balance)}</span></div></div>
+    ${holders.length?`<h3 style="margin-top:14px">الفلوس المقبوضة موجودة فين</h3>${holders.map(([h,a])=>`<div class="item"><div class="t"><b>${esc(h)}</b>${h!==DRAWER&&h!==CWALLET?'<div>عهدة عند الشخص ده</div>':''}</div><span class="num">${fmt(a)}</span>${h!==DRAWER&&h!==CWALLET?`<button class="btn sm soft" data-act="handover" data-h="${esc(h)}" data-to="${DRAWER}">للدرج</button><button class="btn sm soft" data-act="handover" data-h="${esc(h)}" data-to="${CWALLET}">لمحفظة المركز</button>`:''}</div>`).join('')}`:''}
+   </div>`;
+
+  const ex=[...cache.expenses].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40);
+  $('#exps').innerHTML=`<div class="box"><div class="head"><h2 style="margin:0">مصاريف المكان</h2><button class="btn sm" data-act="new-exp">+ مصروف</button></div>
+   ${ex.length?ex.map(e=>`<div class="item"><div class="t"><b>${esc(e.type)}</b><div>${dshow(e.date)}${e.note?' · '+esc(e.note):''}</div></div><span>${money(e.amount)}</span><button class="btn sm danger" data-act="del-exp" data-id="${esc(e.id)}">حذف</button></div>`).join(''):'<div class="hint">مفيش مصاريف متسجلة. سجل المرتبات والإيجار والكهرباء والمستهلكات هنا.</div>'}</div>`;
+  const ls=[...cache.losses].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40);
+  $('#losses').innerHTML=`<div class="box"><div class="head"><h2 style="margin:0">خسائر صيانة</h2><button class="btn sm" data-act="new-loss">+ خسارة</button></div>
+   ${ls.length?ls.map(l=>{const d=devs().find(x=>x.id===l.deviceId);return `<div class="item"><div class="t"><b>${esc(l.reason||'بدون سبب')}</b><div>${dshow(l.date)}${d?' · '+esc(d.customer||'')+' '+esc(d.model||''):''}</div></div><span class="crit">${money(l.amount)}</span><button class="btn sm danger" data-act="del-loss" data-id="${esc(l.id)}">حذف</button></div>`}).join(''):'<div class="hint">شاشة اتكسرت وانت بتركبها، أو تعويض عميل؟ سجله هنا عشان يتخصم من الربح.</div>'}</div>`;
+}
+function openExpense(){
+  S.modal={type:'exp'};
+  showModal(`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>مصروف جديد</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
+   <form class="form" id="expform">
+    <div class="g2">${field('النوع',`<select id="e-type">${EXPTYPES.map(t=>`<option>${t}</option>`).join('')}</select>`)}${field('المبلغ (ج)','<input id="e-amt" type="number" inputmode="decimal" step="any" min="0" required>')}</div>
+    <div class="g2">${field('التاريخ',`<input id="e-date" type="date" value="${today()}">`)}${field('ملاحظة','<input id="e-note">')}</div>
+    <button class="btn" type="submit">حفظ المصروف</button></form></div>`);
+  $('#expform').addEventListener('submit',async e=>{e.preventDefault();
+    const amt=num($('#e-amt').value); if(amt<=0){toast('اكتب المبلغ');return}
+    if(await safe(()=>put('expenses',newId('expenses'),{type:$('#e-type').value,amount:amt,date:$('#e-date').value||today(),note:$('#e-note').value.trim()}))){closeModal();toast('اتسجل')}});
+}
+function openLoss(){
+  S.modal={type:'loss'};
+  const opts=[...devs()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,60);
+  showModal(`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>خسارة صيانة</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
+   <form class="form" id="lossform">
+    <div class="g2">${field('المبلغ (ج)','<input id="l-amt" type="number" inputmode="decimal" step="any" min="0" required>')}${field('التاريخ',`<input id="l-date" type="date" value="${today()}">`)}</div>
+    ${field('السبب','<input id="l-reason" placeholder="شاشة اتكسرت وقت التركيب / تعويض عميل">')}
+    ${field('الجهاز المرتبط (اختياري)',`<select id="l-dev"><option value="">بدون</option>${opts.map(d=>`<option value="${esc(d.id)}">#${String(d.no||0).padStart(4,'0')} ${esc(d.customer||'')} - ${esc(d.model||'')}</option>`).join('')}</select>`)}
+    <button class="btn" type="submit">حفظ الخسارة</button></form></div>`);
+  $('#lossform').addEventListener('submit',async e=>{e.preventDefault();
+    const amt=num($('#l-amt').value); if(amt<=0){toast('اكتب المبلغ');return}
+    if(await safe(()=>put('losses',newId('losses'),{amount:amt,date:$('#l-date').value||today(),reason:$('#l-reason').value.trim(),deviceId:$('#l-dev').value}))){closeModal();toast('اتسجلت')}});
+}
+
+/* ----- settings ----- */
+function renderSettings(){
+  const box=$('#settingsBox'); if(!box||box.contains(document.activeElement))return;
+  const st=settings(), fs=finSettings();
+  box.innerHTML=`<div class="box"><h2>الإعدادات</h2><form class="form" id="setform">
+    ${field('التنبيه لو جهاز فضل من غير تحديث (بالأيام)',`<input id="s-days" type="number" inputmode="numeric" min="1" value="${alertDays()}">`)}
+    ${field('أسماء التيم (اسم في كل سطر)',`<textarea id="s-team" style="min-height:110px">${esc((st.team||[]).join('\n'))}</textarea>`)}
+    ${field('رصيد بداية المكان (ج)',`<input id="s-open" type="number" inputmode="decimal" step="any" value="${fs.opening??''}">`)}
+    <div class="hint">أسماء التيم بتظهر كاقتراحات في المستلم والفني وصاحب المحفظة. التيم يقدر يفتح الأجهزة والمخزون، والحسابات والإعدادات ليك بس.</div>
+    <button class="btn" type="submit">حفظ الإعدادات</button></form></div>`;
+  $('#setform').addEventListener('submit',async e=>{e.preventDefault();
+    const days=Math.max(1,Math.round(num($('#s-days').value))||7);
+    const team=$('#s-team').value.split('\n').map(x=>x.trim()).filter(Boolean);
+    const ok1=await safe(()=>put('settings','main',{alertDays:days,team}));
+    const ok2=await safe(()=>put('fin_settings','main',{opening:num($('#s-open').value)}));
+    if(ok1&&ok2)toast('اتحفظت الإعدادات');});
+}
+
+/* ---------- modal ---------- */
+function showModal(html){ $('#modal').innerHTML=`<div class="veil" data-act="veil">${html}</div>`; const f=$('#modal input,#modal select'); }
+function closeModal(){ $('#modal').innerHTML=''; S.modal=null; }
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal)closeModal()});
+
+/* ---------- events ---------- */
+document.addEventListener('input',e=>{
+  if(e.target.id==='q'){S.q=e.target.value;renderDevList()}
+  if(e.target.id==='sq'){renderStock()}
+});
+document.addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.id==='ref'){S.ref=t.value||today();renderMoney();return}
+  if(t.id==='y-method'){const by=$('#y-by');$('#y-holder').value=t.value==='نقدي'?DRAWER:(by&&by.value.trim()||CWALLET);return}
+  const d=curDev();
+  if(d&&t.id==='w-on'){await devPatch(d.id,{warranty:{on:t.checked,months:(d.warranty||{}).months||0,start:(d.warranty||{}).start||''}});return}
+  if(d&&(t.id==='w-m'||t.id==='w-s')){await devPatch(d.id,{warranty:{on:true,months:num($('#w-m').value),start:$('#w-s').value}});return}
+});
+document.addEventListener('click',async e=>{
+  const tab=e.target.closest('[data-tab]'); if(tab){S.tab=tab.dataset.tab;renderTab();return}
+  const fl=e.target.closest('[data-filter]'); if(fl){S.filter=fl.dataset.filter;renderChips();renderDevList();return}
+  const ct=e.target.closest('[data-cat]'); if(ct){S.cat=ct.dataset.cat;renderStock();return}
+  const pr=e.target.closest('[data-period]'); if(pr){S.period=pr.dataset.period;renderMoney();return}
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const act=b.dataset.act, id=b.dataset.id;
+  if(act==='veil'){ if(e.target===b)closeModal(); return }
+  if(act==='close')return closeModal();
+  if(act==='new-dev')return openDevice(null);
+  if(act==='open-dev')return openDevice(id);
+  if(act==='new-item')return openItem(null);
+  if(act==='open-item')return openItem(id);
+  if(act==='new-exp')return openExpense();
+  if(act==='new-loss')return openLoss();
+  const d=curDev();
+  if(act==='set-status'&&d){
+    const k=b.dataset.k; if(k===d.status)return;
+    const data={status:k,statusAt:Date.now(),deliveredAt:k==='done'?today():''};
+    await devPatch(d.id,data); return;
+  }
+  if(act==='add-part'&&d){
+    const name=$('#p-name').value.trim(); if(!name){toast('اكتب اسم القطعة');return}
+    const part={id:'p'+Date.now().toString(36),name,supplier:$('#p-sup').value.trim(),price:num($('#p-price').value),shipping:num($('#p-ship').value)};
+    await devPatch(d.id,{parts:[...(d.parts||[]),part]}); return;
+  }
+  if(act==='add-stock-part'&&d){
+    const it=cache.inventory.find(x=>x.id===$('#p-stock').value);
+    if(!it||num(it.qty)<1){toast('القطعة دي خلصت من المخزون');return}
+    const part={id:'p'+Date.now().toString(36),name:it.name+(it.model?' - '+it.model:''),supplier:it.supplier||'',price:num(it.buyPrice),shipping:0,stockId:it.id,fromStock:true};
+    if(await devPatch(d.id,{parts:[...(d.parts||[]),part]})) await safe(()=>patch('inventory',it.id,{qty:num(it.qty)-1}));
+    return;
+  }
+  if(act==='del-part'&&d){
+    armConfirm(b,async()=>{
+      const p=(d.parts||[]).find(x=>x.id===b.dataset.pid);
+      if(await devPatch(d.id,{parts:(d.parts||[]).filter(x=>x.id!==b.dataset.pid)})&&p&&p.stockId){
+        const it=cache.inventory.find(x=>x.id===p.stockId); if(it)await safe(()=>patch('inventory',it.id,{qty:num(it.qty)+1}));
+      }
+    });return;
+  }
+  if(act==='add-pay'&&d){
+    const amt=num($('#y-amt').value); if(amt<=0){toast('اكتب المبلغ');return}
+    const pay={id:'y'+Date.now().toString(36),amount:amt,method:$('#y-method').value,receivedBy:$('#y-by').value.trim(),holder:$('#y-holder').value.trim()||DRAWER,date:today()};
+    const fullyPaid=num(d.price)>0&&paidOf(d)+amt>=num(d.price);
+    const autoDeliver=fullyPaid&&(d.status==='ready'||d.status==='hold');
+    const data={payments:[...(d.payments||[]),pay]};
+    if(autoDeliver){data.status='done';data.statusAt=Date.now();data.deliveredAt=today();}
+    if(await devPatch(d.id,data)){
+      if(autoDeliver)toast('اتسجلت الدفعة والجهاز اتنقل لتم التسليم');
+      else if(fullyPaid&&d.status!=='done')toast('الدفع كامل. لما العميل يستلم دوس "تم التسليم"');
+    }
+    return;
+  }
+  if(act==='deliver'){
+    const dv=devs().find(x=>x.id===(id||(d&&d.id))); if(!dv||dv.status==='done')return;
+    const left=num(dv.price)-paidOf(dv);
+    const run=async()=>{ if(await devPatch(dv.id,{status:'done',statusAt:Date.now(),deliveredAt:today()}))toast('تم التسليم ✓'); };
+    if(left>0){ armConfirm(b,run); toast('لسه على العميل '+fmt(left)+' ج. اضغط تاني لو هتسلمه'); return; }
+    return run();
+  }
+  if(act==='del-pay'&&d){armConfirm(b,()=>devPatch(d.id,{payments:(d.payments||[]).filter(x=>x.id!==b.dataset.pid)}));return}
+  if(act==='del-dev'&&d){armConfirm(b,async()=>{if(await safe(()=>remove('devices',d.id))){closeModal();toast('اتحذف الجهاز')}});return}
+  if(act==='qty-minus'||act==='qty-plus'){
+    const it=cache.inventory.find(x=>x.id===id); if(!it)return;
+    const q=Math.max(0,num(it.qty)+(act==='qty-plus'?1:-1)); if(q===num(it.qty))return;
+    await safe(()=>patch('inventory',id,{qty:q})); return;
+  }
+  if(act==='del-item'){
+    const itId=S.modal&&S.modal.id; armConfirm(b,async()=>{if(await safe(()=>remove('inventory',itId))){closeModal();toast('اتحذفت')}});return;
+  }
+  if(act==='del-exp'){armConfirm(b,()=>safe(()=>remove('expenses',id)));return}
+  if(act==='del-loss'){armConfirm(b,()=>safe(()=>remove('losses',id)));return}
+  if(act==='handover'){
+    const from=b.dataset.h,to=b.dataset.to;
+    for(const dv of devs()){
+      if((dv.payments||[]).some(p=>(p.holder||DRAWER)===from)){
+        await devPatch(dv.id,{payments:dv.payments.map(p=>(p.holder||DRAWER)===from?{...p,holder:to}:p)});
+      }
+    }
+    toast('اتنقلت العهدة'); return;
+  }
+});
+
+boot();
+})();
+</script>
+
+</body></html>
