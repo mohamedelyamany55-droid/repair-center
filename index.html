@@ -188,7 +188,7 @@ a.btn{text-decoration:none;display:inline-block}
 </style>
 
 <div id="app" dir="rtl">
-  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.7</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
+  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.8</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
   <div id="localbar"></div>
   <main id="view"></main>
 </div>
@@ -616,7 +616,7 @@ function openDevice(id){
   const v=d||{entryDate:today()};
   const html=`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>${d?`جهاز #${String(d.no||0).padStart(4,'0')}`:'جهاز جديد'}</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
    <form class="form" id="devform" autocomplete="off">
-    ${d?'':'<button type="button" class="btn soft" data-act="voice-fill">🎤 سجّل بالصوت</button><div class="hint" id="vhint">دوس واتكلم جملة واحدة، مثال: «العميل محمد، موديل سامسونج A52، العطل شاشة، ملاحظات فيها خدش»</div>'}
+    ${d?'':'<button type="button" class="btn soft" data-act="voice-fill">🎤 سجّل بالصوت</button><div class="hint" id="vhint">دوس واتكلم بشكل عادي، مثال: «أحمد جايب سامسونج A52 شاشتها مكسورة وهيستلمها بكرة». لو فيه حاجة ناقصة هسألك عنها.</div><div id="vq"></div>'}
     <div class="g2">${field('اسم العميل',`<input id="f-customer" value="${esc(v.customer)}" required>`)}${field('رقم التليفون',`<input id="f-phone" type="tel" inputmode="tel" dir="ltr" value="${esc(v.phone)}">`)}</div>
     <div class="g2">${field('نوع الجهاز',`<input id="f-model" value="${esc(v.model)}" placeholder="مثال: Redmi A1 Plus">`)}${field('السيريال / IMEI (اختياري)',`<input id="f-imei" class="mono" inputmode="numeric" dir="ltr" value="${esc(v.imei)}">`)}</div>
     ${field('العطل المذكور',`<textarea id="f-issue">${esc(v.issue)}</textarea>`)}
@@ -1357,32 +1357,211 @@ document.addEventListener('click',async e=>{
 });
 
 
-/* ---------- voice input for a new device (browser speech recognition, Egyptian Arabic) ---------- */
+/* ---------- voice input for a new device (browser speech recognition + smart rule-based parsing; free, no AI service) ---------- */
+const vxN=s=>String(s||'').toLowerCase().replace(/[ً-ٰٟـ]/g,'').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي');
+const vxDig=s=>String(s||'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-0x660)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-0x6F0));
+const vxSet=a=>new Set(a.map(vxN));
+const vxHas=(set,n)=>set.has(n)||set.has(n.replace(/^وال/,'ال'))||(n.length>3&&set.has(n.replace(/^و/,'')))||(n.length>3&&set.has(n.replace(/^ال/,'')))||(n.length>4&&set.has(n.replace(/^وال/,'')));
+const vxFix=w=>/^[a-z]+\d+[a-z+]*$/i.test(w)?w.toUpperCase():w;
+
+const VX_BRAND=vxSet(['سامسونج','سامسونغ','samsung','جالاكسي','جلاكسي','galaxy','ريدمي','redmi','شاومي','xiaomi','بوكو','poco','ايفون','iphone','ابل','apple','ايباد','ipad','اوبو','oppo','ريلمي','realme','ريالمي','فيفو','vivo','هواوي','huawei','هونر','honor','انفينكس','infinix','تكنو','tecno','ايتل','itel','نوكيا','nokia','موتورولا','motorola','لينوفو','lenovo','سوني','sony','oneplus','بكسل','pixel','تاب','tab']);
+const VX_MODELW=vxSet(['بلس','plus','برو','pro','ماكس','max','الترا','ultra','نوت','note','برايم','prime','كور','core','ميني','mini','لايت','lite','اير','air','نيو','neo','جو','go','بروماكس']);
+const VX_LETTERS=new Map([['اي','A'],['ايه','A'],['اس','S'],['ام','M'],['اف','F'],['جي','G'],['اكس','X'],['واي','Y'],['تي','T'],['اتش','H'],['بي','B'],['سي','C'],['دي','D'],['ار','R']].map(([k,v])=>[vxN(k),v]));
+const VX_CUSTMARK=vxSet(['اسمه','اسمها','باسم','العميل','عميل','الاسم','اسم','الاستاذ','استاذ','الحاج','الحاجه','حاج','دكتور','الدكتور','مستر','مدام','بتاع','بتاعه','بتاعت','للعميل','للحاج']);
+const VX_TITLE=vxSet(['الاستاذ','استاذ','الحاج','الحاجه','حاج','دكتور','الدكتور','مستر','مدام']);
+const VX_DUEMARK=vxSet(['هيستلم','هيستلمه','هيستلمها','يستلم','يستلمه','يستلمها','هياخده','هياخدها','ياخده','ياخدها','هيجي','هيجيله','ميعاد','معاد','موعد','التسليم','الاستلام','تسليم','استلام','عايزه','عايزها','عاوزه','عاوزها','محتاجه','محتاجها','ومحتاجه','ومحتاجها','عايز','عاوز','محتاج','ومحتاج']);
+const VX_PHONEMARK=vxSet(['رقم','رقمه','رقمها','ورقمه','ورقمها','الرقم','والرقم','التليفون','تليفون','تليفونه','تليفونها','الموبايل','موبايل','موبايله','موبايلها','الجوال','جواله','واتس','واتساب','الواتس']);
+const VX_ISSUESTOP=vxSet(['جاب','جايب','جابت','جابه','جاي','جايه','جه','جات','معايا','معاه','معاها']);
+const VX_NOTESTART=new Set(['ملاحظات','ملاحظه','لاحظت','وفيه','وفيها','وعليه','وعليها'].map(vxN));
+const VX_FILL=vxSet(['عايز','عايزه','عاوز','عاوزه','جاب','جايب','جابت','جابه','جالي','جاي','جايه','جه','جات','معايا','معاه','معاها','عنده','عندها','عندي','عندنا','ده','دي','دا','دول','هو','هي','ان','انه','انها','مع','ومعاه','ومعاها','بيقول','بتقول','بيقولي','بيشتكي','مشكلته','مشكلتها','الجهاز','جهاز','وده','ودي','و','كمان','برضه','تمام','اه','ايوه','طيب','بقي','يا','الو','جديد','تعالي','سجل','سجلي','سجلت','دخل','دخلت','استلمنا','استلمت','خد','خدت',...VX_DUEMARK,...VX_PHONEMARK]);
+const VX_DIGW={صفر:0,واحد:1,اتنين:2,اثنين:2,تلاته:3,ثلاثه:3,اربعه:4,اربع:4,خمسه:5,سته:6,سبعه:7,تمانيه:8,ثمانيه:8,تسعه:9};
+const VX_WNUM={ميه:100,مايه:100,ميتين:200,تلتميه:300,ثلاثميه:300,ربعميه:400,خمسميه:500,ستميه:600,سبعميه:700,تمنميه:800,تسعميه:900,الف:1000,الفين:2000};
+const VX_PL='(?:السعر|بسعر|سعره|سعرها|تمنه|تمنها|ثمنه|التكلفه|تكلفته|حسابه|حسابها|بمبلغ|المبلغ|هيتكلف|هتكلف|ب)';
+const VX_CUR='(?:جنيه|جنيها|جنيهات|ج)';
+const VX_WN='(?:ميه|مايه|ميتين|تلتميه|ثلاثميه|ربعميه|خمسميه|ستميه|سبعميه|تمنميه|تسعميه|الفين|الف)';
+const VX_PRICE_RES=[
+  new RegExp('(^|\\s)('+VX_PL+'\\s+(?:حوالي\\s+)?(?:\\d+|'+VX_WN+')(?:\\s+'+VX_CUR+')?)(?=\\s|$)'),
+  new RegExp('(^|\\s)((?:\\d+|'+VX_WN+')\\s+'+VX_CUR+')(?=\\s|$)')
+];
+const VX_NUMW='(?:ثلاث|تلات|اربع|خمس|ست|سبع|تمان|ثمان|تسع|عشر)ه?';
+const VX_DUE_RE=new RegExp('(^|\\s)((?:بعد\\s+(?:بكره|ساعه\\s+ونص|ساعه|ساعتين|ساعات|يوم|يومين|اسبوع|اسبوعين|شهر|نص\\s+ساعه|ربع\\s+ساعه|\\d+\\s+(?:ساعات|ساعه|ايام|يوم|دقيقه|دقايق|اسبوع|اسابيع)|'+VX_NUMW+'\\s+(?:ساعات|ايام))|بكره|النهارده|انهارده|الليله|(?:يوم\\s+)?(?:السبت|الاحد|الاثنين|الاتنين|الثلاثاء|التلات|الاربع|الاربعاء|الخميس|الجمعه)|(?:الاسبوع|الشهر)\\s+(?:الجاي|الجايه|القادم|الجاى)|اخر\\s+(?:اليوم|النهار)|خلال\\s+\\S+(?:\\s+(?:ساعات|ساعه|ايام|يوم|اسبوع|ساعتين|يومين))?|(?:الساعه|ساعه)\\s+\\d+(?:\\s+(?:الضهر|العصر|بالليل|المغرب|الصبح))?))(?=\\s|$)');
+const VX_LAB2=[['اسم العميل','customer'],['نوع الجهاز','model'],['رقم التليفون','phone'],['رقم الموبايل','phone'],['رقم الجوال','phone']].map(([k,v])=>[vxN(k),v]);
+const VX_LAB1=new Map([['العميل','customer'],['الاسم','customer'],['اسم','customer'],['موديل','model'],['الموديل','model'],['العطل','issue'],['عطل','issue'],['المشكله','issue'],['مشكله','issue'],['المشكلة','issue'],['ملاحظات','notes'],['ملاحظه','notes'],['ملاحظة','notes']].map(([k,v])=>[vxN(k),v]));
+const vxFault=t=>{
+  const n=t.n;
+  return n==='مش'||n==='ميت'||/^م(?:بي|بت|ب)\S*ش$/.test(n)||/^(?:ال|و|وال)?(?:شاش|بطار|شحن|بيشحن|شاحن|سماع|مايك|ميكروف|كامير|تاتش|لمس|صوت|سبيكر|شبك|سيم|بصم|زرار|ازرار|باور|فلات|فلاش|ريستارت|هنج|هنك|سوفت|فورمات|غرق|مياه|وقع|واقع|اتكسر|مكسور|كسر|سخن|بيسخن|بيفصل|بتفصل|فصل|بيهنج|بتهنج|معلق|بيعلق|تغيير|تبديل|تغير|اهتزاز|فيبره|بورده|ايسي|تقطيع|ظلام|سواد|لوحه|مشكل|عطل)/.test(n);
+};
+function vxFind(T,re){
+  const starts=[],parts=[]; let pos=0;
+  T.forEach(t=>{const x=t.used?'§':t.n; starts.push(pos); parts.push(x); pos+=x.length+1});
+  const s=parts.join(' '), m=re.exec(s); if(!m)return null;
+  const off=m.index+m[1].length, end=off+m[2].length;
+  const i0=starts.indexOf(off); if(i0<0)return null;
+  let i1=i0; while(i1<T.length-1&&starts[i1]+parts[i1].length<end)i1++;
+  return {i0,i1,text:m[2]};
+}
+function vxTok(text){
+  const t=vxDig(text).replace(/[،,؛;؟?!:"«»()\[\]]+/g,' ').replace(/\.(?=\s|$)/g,' ').replace(/\s+/g,' ').trim();
+  if(!t)return [];
+  return t.split(' ').map(w=>({w,n:vxN(w),used:false}));
+}
+/* understands free speech: phone, price, delivery time, device model, fault, customer name, notes */
 function parseVoice(text){
-  const t=String(text||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\s+/g,' ').trim();
-  const map={'اسم العميل':'customer','العميل':'customer','الاسم':'customer','اسم':'customer',
-    'رقم التليفون':'phone','رقم الموبايل':'phone','التليفون':'phone','تليفون':'phone','الموبايل':'phone','موبايل':'phone',
-    'نوع الجهاز':'model','الموديل':'model','موديل':'model','الجهاز':'model',
-    'العطل':'issue','عطل':'issue','المشكلة':'issue','مشكلة':'issue',
-    'ملاحظات':'notes','ملاحظة':'notes'};
-  const words=Object.keys(map).sort((a,b)=>b.length-a.length);
-  const re=new RegExp('(^|\\s)('+words.join('|')+')(?=\\s|$)','g');
-  const hits=[]; let m;
-  while((m=re.exec(t))){hits.push({f:map[m[2]],start:m.index+m[1].length,end:m.index+m[0].length})}
-  const out={};
-  if(!hits.length){out.notes=t;return out}
-  hits.forEach((h,i)=>{
-    let v=t.slice(h.end,i+1<hits.length?hits[i+1].start:t.length).trim().replace(/^(هو|هي|ده|دي|:|،|,)\s*/,'').replace(/[،,.\s]+$/,'');
-    if(h.f==='phone')v=digits(v);
-    if(v&&!out[h.f])out[h.f]=v;
+  const T=vxTok(text), out={}; if(!T.length)return out;
+  const mark=(a,b)=>{for(let i=a;i<=b;i++)T[i].used=true};
+  const words=idx=>idx.map(i=>T[i].w).join(' ');
+  const free=i=>i>=0&&i<T.length&&!T[i].used;
+
+  /* 1. phone: a run of digit tokens (or spoken digit words) that looks like a phone number */
+  const isD=t=>/^\+?\d+$/.test(t.n)||VX_DIGW[t.n]!==undefined;
+  const dv=t=>/^\+?\d+$/.test(t.n)?t.n.replace('+',''):String(VX_DIGW[t.n]);
+  for(let i=0;i<T.length&&!out.phone;i++){
+    if(T[i].used||!isD(T[i]))continue;
+    let j=i,s=''; while(j<T.length&&!T[j].used&&isD(T[j])){s+=dv(T[j]);j++}
+    s=s.replace(/^00/,''); if(/^20\d{10}$/.test(s))s='0'+s.slice(2);
+    let p=''; const m=s.match(/01[0125]\d{8}/);
+    if(m)p=m[0]; else if(/^0\d{8,10}$/.test(s))p=s; else if(/^1[0125]\d{8}$/.test(s))p='0'+s;
+    if(p){out.phone=p; mark(i,j-1); let k=i-1; while(free(k)&&vxHas(VX_PHONEMARK,T[k].n)){T[k].used=true;k--}}
+    i=j-1;
+  }
+  /* 2. price */
+  for(const re of VX_PRICE_RES){
+    const r=vxFind(T,re); if(!r)continue;
+    const d=r.text.match(/\d+/); let amt=d?Number(d[0]):0;
+    if(!d)r.text.split(' ').forEach(w=>{if(VX_WNUM[w])amt=VX_WNUM[w]});
+    if(amt>0){out.price=amt; mark(r.i0,r.i1); break}
+  }
+  /* 3. delivery time */
+  const rd=vxFind(T,VX_DUE_RE);
+  if(rd){out.due=words(Array.from({length:rd.i1-rd.i0+1},(_,k)=>rd.i0+k)); mark(rd.i0,rd.i1); let k=rd.i0-1; while(free(k)&&vxHas(VX_DUEMARK,T[k].n)){T[k].used=true;k--}}
+
+  /* 4. explicit labels ("الموديل ..."، "العطل ..."، "ملاحظات ...") still work */
+  const labs=[];
+  for(let i=0;i<T.length;i++){
+    if(T[i].used)continue;
+    const two=i+1<T.length&&!T[i+1].used?VX_LAB2.find(p=>p[0]===T[i].n+' '+T[i+1].n):null;
+    if(two){labs.push({i,len:2,f:two[1]});i++;continue}
+    const f=VX_LAB1.get(T[i].n); if(f)labs.push({i,len:1,f});
+  }
+  labs.forEach((L,li)=>{
+    const end=li+1<labs.length?labs[li+1].i:T.length;
+    mark(L.i,L.i+L.len-1);
+    if(L.f==='phone'||out[L.f])return;
+    const idx=[]; for(let i=L.i+L.len;i<end;i++){ if(!T[i].used)idx.push(i) }
+    let take=idx;
+    if(L.f==='customer'){take=[]; for(const i of idx){ const t=T[i]; if(take.length>=3||vxHas(VX_FILL,t.n)||vxHas(VX_BRAND,t.n)||vxFault(t)||/\d/.test(t.n)||vxHas(VX_CUSTMARK,t.n))break; take.push(i)}}
+    if(take.length){out[L.f]=words(take); take.forEach(i=>T[i].used=true)}
   });
+
+  /* 5. notes: everything after "وفيه / وفيها / ملاحظات..." */
+  if(!out.notes){
+    const k=T.findIndex(t=>!t.used&&VX_NOTESTART.has(t.n));
+    if(k>=0){
+      const idx=[]; for(let i=k;i<T.length;i++){ if(!T[i].used)idx.push(i) }
+      const skip=/^(ملاحظات|ملاحظه|لاحظت)$/.test(T[k].n);
+      const body=idx.map((i,q)=>q===0?(skip?'':T[i].w.replace(/^و/,'')):T[i].w).filter(Boolean).join(' ');
+      if(body){out.notes=body}
+      idx.forEach(i=>T[i].used=true);
+    }
+  }
+
+  /* 6. device model: a known brand + the model words after it, or a latin model code like A52 */
+  if(!out.model){
+    let bi=-1;
+    for(let i=0;i<T.length;i++){ if(free(i)&&vxHas(VX_BRAND,T[i].n)){bi=i;break} }
+    if(bi<0){ for(let i=0;i<T.length;i++){ if(free(i)&&/^(?:[a-z]+\d+[a-z+]*|\d+[a-z]+)$/.test(T[i].n)){bi=i;break} } }
+    if(bi>=0){
+      const idx=[bi], parts=[vxFix(T[bi].w)]; let j=bi+1;
+      while(free(j)&&parts.length<7&&!vxFault(T[j])&&!vxHas(VX_CUSTMARK,T[j].n)&&!vxHas(VX_BRAND,T[j].n)){
+        const n=T[j].n;
+        if(VX_LETTERS.has(n)&&free(j+1)&&/^\d/.test(T[j+1].n)){parts.push(VX_LETTERS.get(n)+T[j+1].w);idx.push(j,j+1);j+=2;continue}
+        if(/^[a-z0-9+\-]+$/.test(n)||vxHas(VX_MODELW,n)){parts.push(vxFix(T[j].w));idx.push(j);j++;continue}
+        break;
+      }
+      out.model=parts.join(' '); idx.forEach(i=>T[i].used=true);
+    }
+  }
+
+  /* 7. fault: from the first fault word to the end of that phrase */
+  if(!out.issue){
+    const s=T.findIndex(t=>!t.used&&vxFault(t));
+    if(s>=0){
+      const idx=[s]; let j=s+1;
+      while(free(j)&&!vxHas(VX_BRAND,T[j].n)&&!vxHas(VX_CUSTMARK,T[j].n)&&!vxHas(VX_ISSUESTOP,T[j].n)){idx.push(j);j++}
+      out.issue=words(idx); idx.forEach(i=>T[i].used=true);
+    }
+  }
+
+  /* 8. customer name: after a marker ("اسمه"، "العميل"، "بتاع"، "الحاج") or the first free words that look like a name */
+  if(!out.customer){
+    const stopName=i=>!free(i)||vxHas(VX_FILL,T[i].n)||vxHas(VX_BRAND,T[i].n)||vxFault(T[i])||/\d/.test(T[i].n)||vxHas(VX_CUSTMARK,T[i].n);
+    let found=null;
+    for(let i=0;i<T.length&&!found;i++){
+      if(!free(i)||!vxHas(VX_CUSTMARK,T[i].n))continue;
+      let k=i; const heads=[]; while(free(k)&&vxHas(VX_CUSTMARK,T[k].n)){heads.push(k);k++}
+      const nm=[]; while(nm.length<3&&k<T.length&&!stopName(k)){nm.push(k);k++}
+      if(nm.length)found={heads,nm};
+    }
+    if(found){
+      const keep=found.heads.filter(i=>vxHas(VX_TITLE,T[i].n));
+      out.customer=words([...keep,...found.nm]); found.heads.concat(found.nm).forEach(i=>T[i].used=true);
+    }else{
+      let k=0; while(k<T.length&&stopName(k))k++;
+      const nm=[]; while(nm.length<3&&k<T.length&&!stopName(k)){nm.push(k);k++}
+      if(nm.length){out.customer=words(nm); nm.forEach(i=>T[i].used=true)}
+    }
+  }
+
+  /* 9. anything left over goes to the notes so nothing you said is lost */
+  const left=T.filter(t=>!t.used&&!vxHas(VX_FILL,t.n)&&!vxHas(VX_CUSTMARK,t.n)).map(t=>t.w);
+  if(left.length)out.notes=((out.notes?out.notes+' ':'')+left.join(' ')).trim();
   return out;
 }
-let voiceRec=null;
+
+/* ----- voice recording + follow-up questions ----- */
+const VX_IDS={customer:'f-customer',phone:'f-phone',model:'f-model',issue:'f-issue',notes:'f-notes',due:'f-due',price:'f-price'};
+const VX_NAMES={customer:'العميل',phone:'التليفون',model:'الجهاز',issue:'العطل',due:'التسليم',price:'السعر',notes:'ملاحظات'};
+const VQ_ASK=[['customer','اسم العميل إيه؟'],['phone','رقم التليفون كام؟'],['model','نوع الجهاز إيه؟ (مثال: سامسونج A52)'],['issue','العطل إيه؟'],['due','ميعاد التسليم إمتى؟']];
+let voiceRec=null, vq=null;
+function vqNext(){
+  const box=$('#vq'); if(!box||!$('#devform')){vq=null;return}
+  while(vq&&vq.i<VQ_ASK.length){const el=$('#'+VX_IDS[VQ_ASK[vq.i][0]]); if(el&&!el.value.trim())break; vq.i++}
+  if(!vq||vq.i>=VQ_ASK.length){vq=null; box.innerHTML='<div class="hint good">تمام، الخانات الأساسية اتملت. راجعها وسجّل الجهاز.</div>'; return}
+  const a=VQ_ASK[vq.i], left=VQ_ASK.length-vq.i;
+  box.innerHTML=`<div class="box" style="margin:0"><div class="hint">باقي ${left} من الأسئلة</div><div style="font-weight:600;margin:4px 0 8px">${esc(a[1])}</div><div class="tools"><input class="search" id="vq-in" autocomplete="off" placeholder="اكتب الإجابة أو دوس المايك"><button class="btn soft sm" type="button" data-act="vq-mic">🎤</button></div><div class="acts"><button class="btn sm" type="button" data-act="vq-ok">تمام</button><button class="btn ghost sm" type="button" data-act="vq-skip">تخطي</button><button class="btn ghost sm" type="button" data-act="vq-stop">كفاية أسئلة</button></div></div>`;
+  if(vq.auto)setTimeout(()=>{if(vq&&vq.auto&&$('#devform')&&!voiceRec)vqListen()},500);
+}
+function vqApply(text){
+  if(!vq)return false;
+  const a=VQ_ASK[vq.i], k=a[0]; text=String(text||'').trim();
+  if(!text){toast('مسمعتش حاجة، جرب تاني'); return false}
+  const p=parseVoice(text); let v=p[k];
+  if(k==='phone'){ if(!v){toast('مفهمتش الرقم، اكتبه أو قوله تاني'); return false} }
+  else if(!v)v=text;
+  const el=$('#'+VX_IDS[k]); if(el)el.value=v;
+  vq.i++; vqNext(); return true;
+}
+function vqListen(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('المتصفح ده مش بيدعم التسجيل الصوتي، اكتب الإجابة'); return}
+  if(voiceRec){try{voiceRec.stop()}catch(e){} return}
+  const rec=new SR(); voiceRec=rec; let buf='';
+  rec.lang='ar-EG'; rec.continuous=false; rec.interimResults=false; rec.maxAlternatives=1;
+  const mic=$('[data-act="vq-mic"]'); if(mic)mic.textContent='⏹ بسمعك...';
+  rec.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){if(ev.results[i].isFinal)buf+=' '+ev.results[i][0].transcript}};
+  rec.onerror=ev=>{if(vq)vq.auto=false; toast(ev.error==='not-allowed'||ev.error==='service-not-allowed'?'اسمح للمتصفح باستخدام المايك':ev.error==='no-speech'?'مسمعتش حاجة، جرب تاني':'التسجيل مانفعش، جرب تاني')};
+  rec.onend=()=>{
+    voiceRec=null; const m=$('[data-act="vq-mic"]'); if(m)m.textContent='🎤';
+    if(!vq||!$('#devform'))return;
+    if(buf.trim()){vq.auto=true; if(!vqApply(buf))vq.auto=false} else vq.auto=false;
+  };
+  try{rec.start()}catch(e){voiceRec=null; if(mic)mic.textContent='🎤'; toast('التسجيل مانفعش، جرب تاني')}
+}
 function voiceFill(btn){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast('المتصفح ده مش بيدعم التسجيل الصوتي، استخدم كروم');return}
   if(voiceRec){try{voiceRec.stop()}catch(e){} return}
+  vq=null; const vqBox=$('#vq'); if(vqBox)vqBox.innerHTML='';
   const rec=new SR(); voiceRec=rec; let buf='';
   rec.lang='ar-EG'; rec.continuous=true; rec.interimResults=false; rec.maxAlternatives=1;
   const label='🎤 سجّل بالصوت', hint=$('#vhint');
@@ -1392,15 +1571,22 @@ function voiceFill(btn){
   rec.onend=()=>{
     voiceRec=null; btn.textContent=label; btn.classList.remove('danger');
     const text=buf.trim(); if(!text||!$('#devform'))return;
-    const p=parseVoice(text);
-    const ids={customer:'f-customer',phone:'f-phone',model:'f-model',issue:'f-issue',notes:'f-notes'};
-    const filled=[];
-    Object.keys(p).forEach(k=>{const el=$('#'+ids[k]); if(el){el.value=p[k]; filled.push(k)}});
-    if(hint)hint.innerHTML='سمعتك: «'+esc(text)+'». راجع الخانات وصحّح لو فيه غلط قبل التسجيل.'+(Object.keys(p).length===1&&p.notes&&!/ملاحظ/.test(text)?' <b class="crit">ماتعرفتش الكلمات (العميل، الموديل، العطل)، فاتحط الكلام كله في الملاحظات.</b>':'');
+    const p=parseVoice(text), shown=[];
+    Object.keys(p).forEach(k=>{const el=$('#'+VX_IDS[k]); if(!el)return; el.value=p[k]; shown.push(VX_NAMES[k]+': '+p[k])});
+    if(hint)hint.innerHTML='سمعتك: «'+esc(text)+'»<br>فهمت: '+(shown.length?esc(shown.join(' · ')):'<b class="crit">مفهمتش حاجة محددة</b>')+'<br>راجع الخانات وصحّح لو فيه غلط.';
+    vq={i:0,auto:false}; vqNext();
   };
   try{rec.start()}catch(e){voiceRec=null;btn.textContent=label;btn.classList.remove('danger');toast('التسجيل مانفعش، جرب تاني')}
 }
-document.addEventListener('click',e=>{const b=e.target.closest('[data-act="voice-fill"]'); if(b)voiceFill(b)});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b)return; const a=b.dataset.act;
+  if(a==='voice-fill')voiceFill(b);
+  else if(a==='vq-mic')vqListen();
+  else if(a==='vq-ok'){const i=$('#vq-in'); if(i)vqApply(i.value)}
+  else if(a==='vq-skip'){if(vq){vq.i++; vq.auto=false; vqNext()}}
+  else if(a==='vq-stop'){vq=null; if(voiceRec){try{voiceRec.stop()}catch(x){}} const bx=$('#vq'); if(bx)bx.innerHTML=''}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='vq-in'){e.preventDefault(); vqApply(e.target.value)}});
 
 boot();
 })();
