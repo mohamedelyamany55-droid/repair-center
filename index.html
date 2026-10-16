@@ -188,7 +188,7 @@ a.btn{text-decoration:none;display:inline-block}
 </style>
 
 <div id="app" dir="rtl">
-  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.6</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
+  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.7</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
   <div id="localbar"></div>
   <main id="view"></main>
 </div>
@@ -616,6 +616,7 @@ function openDevice(id){
   const v=d||{entryDate:today()};
   const html=`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>${d?`جهاز #${String(d.no||0).padStart(4,'0')}`:'جهاز جديد'}</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
    <form class="form" id="devform" autocomplete="off">
+    ${d?'':'<button type="button" class="btn soft" data-act="voice-fill">🎤 سجّل بالصوت</button><div class="hint" id="vhint">دوس واتكلم جملة واحدة، مثال: «العميل محمد، موديل سامسونج A52، العطل شاشة، ملاحظات فيها خدش»</div>'}
     <div class="g2">${field('اسم العميل',`<input id="f-customer" value="${esc(v.customer)}" required>`)}${field('رقم التليفون',`<input id="f-phone" type="tel" inputmode="tel" dir="ltr" value="${esc(v.phone)}">`)}</div>
     <div class="g2">${field('نوع الجهاز',`<input id="f-model" value="${esc(v.model)}" placeholder="مثال: Redmi A1 Plus">`)}${field('السيريال / IMEI (اختياري)',`<input id="f-imei" class="mono" inputmode="numeric" dir="ltr" value="${esc(v.imei)}">`)}</div>
     ${field('العطل المذكور',`<textarea id="f-issue">${esc(v.issue)}</textarea>`)}
@@ -1355,6 +1356,51 @@ document.addEventListener('click',async e=>{
   if(act==='kb-from-dev'){S.kbq=d.issue||d.model||''; closeModal(); S.tab='kb'; renderTab(); return}
 });
 
+
+/* ---------- voice input for a new device (browser speech recognition, Egyptian Arabic) ---------- */
+function parseVoice(text){
+  const t=String(text||'').replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\s+/g,' ').trim();
+  const map={'اسم العميل':'customer','العميل':'customer','الاسم':'customer','اسم':'customer',
+    'رقم التليفون':'phone','رقم الموبايل':'phone','التليفون':'phone','تليفون':'phone','الموبايل':'phone','موبايل':'phone',
+    'نوع الجهاز':'model','الموديل':'model','موديل':'model','الجهاز':'model',
+    'العطل':'issue','عطل':'issue','المشكلة':'issue','مشكلة':'issue',
+    'ملاحظات':'notes','ملاحظة':'notes'};
+  const words=Object.keys(map).sort((a,b)=>b.length-a.length);
+  const re=new RegExp('(^|\\s)('+words.join('|')+')(?=\\s|$)','g');
+  const hits=[]; let m;
+  while((m=re.exec(t))){hits.push({f:map[m[2]],start:m.index+m[1].length,end:m.index+m[0].length})}
+  const out={};
+  if(!hits.length){out.notes=t;return out}
+  hits.forEach((h,i)=>{
+    let v=t.slice(h.end,i+1<hits.length?hits[i+1].start:t.length).trim().replace(/^(هو|هي|ده|دي|:|،|,)\s*/,'').replace(/[،,.\s]+$/,'');
+    if(h.f==='phone')v=digits(v);
+    if(v&&!out[h.f])out[h.f]=v;
+  });
+  return out;
+}
+let voiceRec=null;
+function voiceFill(btn){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('المتصفح ده مش بيدعم التسجيل الصوتي، استخدم كروم');return}
+  if(voiceRec){try{voiceRec.stop()}catch(e){} return}
+  const rec=new SR(); voiceRec=rec; let buf='';
+  rec.lang='ar-EG'; rec.continuous=true; rec.interimResults=false; rec.maxAlternatives=1;
+  const label='🎤 سجّل بالصوت', hint=$('#vhint');
+  btn.textContent='⏹ بسمعك... دوس لما تخلص'; btn.classList.add('danger');
+  rec.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){if(ev.results[i].isFinal)buf+=' '+ev.results[i][0].transcript}};
+  rec.onerror=ev=>{toast(ev.error==='not-allowed'||ev.error==='service-not-allowed'?'اسمح للمتصفح باستخدام المايك':ev.error==='no-speech'?'مسمعتش حاجة، جرب تاني':'التسجيل مانفعش، جرب تاني')};
+  rec.onend=()=>{
+    voiceRec=null; btn.textContent=label; btn.classList.remove('danger');
+    const text=buf.trim(); if(!text||!$('#devform'))return;
+    const p=parseVoice(text);
+    const ids={customer:'f-customer',phone:'f-phone',model:'f-model',issue:'f-issue',notes:'f-notes'};
+    const filled=[];
+    Object.keys(p).forEach(k=>{const el=$('#'+ids[k]); if(el){el.value=p[k]; filled.push(k)}});
+    if(hint)hint.innerHTML='سمعتك: «'+esc(text)+'». راجع الخانات وصحّح لو فيه غلط قبل التسجيل.'+(Object.keys(p).length===1&&p.notes&&!/ملاحظ/.test(text)?' <b class="crit">ماتعرفتش الكلمات (العميل، الموديل، العطل)، فاتحط الكلام كله في الملاحظات.</b>':'');
+  };
+  try{rec.start()}catch(e){voiceRec=null;btn.textContent=label;btn.classList.remove('danger');toast('التسجيل مانفعش، جرب تاني')}
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act="voice-fill"]'); if(b)voiceFill(b)});
 
 boot();
 })();
