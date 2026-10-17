@@ -1,6 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>متابعة المركز</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Layout: job-ticket cards on a cool bench-grey ground, bottom tab bar on phones, bottom-sheet forms. */
 :root{
@@ -125,6 +124,13 @@ label.chk input{width:20px;height:20px;accent-color:var(--accent)}
 .toast{position:fixed;inset-inline:0;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;justify-content:center;pointer-events:none}
 .toast span{background:var(--ink);color:var(--bg);border-radius:10px;padding:8px 14px;font-size:14px;max-width:90%}
 .local{background:var(--crit-bg);color:var(--crit);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px}
+.mw{position:relative;display:block}
+.mw input,.mw textarea{padding-inline-end:42px}
+.mw input[dir=ltr]{padding-inline-end:10px;padding-inline-start:42px}
+.mic{position:absolute;inset-inline-end:4px;top:4px;width:32px;height:32px;border-radius:8px;border:0;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;cursor:pointer;padding:0}
+.mic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mic.on{background:var(--crit);color:#fff}
+@media (prefers-reduced-motion:no-preference){.mic.on{animation:micpulse 1s ease-in-out infinite}@keyframes micpulse{50%{opacity:.6}}}
 @media (max-width:420px){.g2{grid-template-columns:1fr}}
 #login{background:var(--bg)}
 .loginwrap{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:20px}
@@ -188,7 +194,7 @@ a.btn{text-decoration:none;display:inline-block}
 </style>
 
 <div id="app" dir="rtl">
-  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.8</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
+  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v1.9</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
   <div id="localbar"></div>
   <main id="view"></main>
 </div>
@@ -212,6 +218,7 @@ const money=n=>`<span class="num">${fmt(n)}</span> ج`;
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const today=()=>iso(new Date());
+const nowTime=()=>{const n=new Date();return `${pad(n.getHours())}:${pad(n.getMinutes())}`};
 const parse=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,(m||1)-1,d||1)};
 const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
 const dshow=s=>{if(!s)return '—';const [y,m,d]=s.split('-');return `${+d}/${+m}/${y}`};
@@ -477,6 +484,9 @@ const priMid=()=>{const n=Number(settings().priMid);return n>0?n:200};
 const teamNames=()=>settings().team||[];
 const devs=()=>cache.devices;
 const partCost=d=>(d.parts||[]).reduce((s,p)=>s+num(p.price)+num(p.shipping),0);
+/* a part is deducted from profit on the day it was logged (older parts without a date fall back to the device's dates) */
+const partDate=(p,d)=>p.date||d.deliveredAt||(d.createdAt?iso(new Date(d.createdAt)):(d.entryDate||''));
+const partsLoggedIn=(R)=>devs().reduce((s,d)=>s+(d.parts||[]).filter(p=>{const x=partDate(p,d);return x&&x>=R.from&&x<=R.to}).reduce((a,p)=>a+num(p.price)+num(p.shipping),0),0);
 const paidOf=d=>(d.payments||[]).reduce((s,p)=>s+num(p.amount),0);
 const linkedLoss=d=>cache.losses.filter(l=>l.deviceId===d.id).reduce((s,l)=>s+num(l.amount),0);
 function isStale(d){ if(d.status==='done')return false; const t=d.statusAt||d.createdAt||0; return t&&(Date.now()-t)/864e5>=alertDays(); }
@@ -621,7 +631,8 @@ function openDevice(id){
     <div class="g2">${field('نوع الجهاز',`<input id="f-model" value="${esc(v.model)}" placeholder="مثال: Redmi A1 Plus">`)}${field('السيريال / IMEI (اختياري)',`<input id="f-imei" class="mono" inputmode="numeric" dir="ltr" value="${esc(v.imei)}">`)}</div>
     ${field('العطل المذكور',`<textarea id="f-issue">${esc(v.issue)}</textarea>`)}
     <div class="g2">${field('اسم المستلم',`<input id="f-receiver" list="dl-people" value="${esc(v.receiver)}">`)}${field('الفني المسؤول',`<input id="f-tech" list="dl-people" value="${esc(v.tech)}">`)}</div>
-    <div class="g2">${field('تاريخ الدخول',`<input id="f-entry" type="date" value="${esc(v.entryDate||today())}">`)}${field('معاد التسليم المتفق عليه',`<input id="f-due" value="${esc(v.due)}" placeholder="بعد ساعتين / بكرة / بعد يومين">`)}</div>
+    <div class="g2">${field(d?'تاريخ الدخول':'تاريخ الدخول (تلقائي)',`<input id="f-entry" type="date" value="${esc(v.entryDate||today())}">`)}${field(d?'وقت الدخول':'وقت الدخول (تلقائي)',`<input id="f-entry-time" type="time" value="${esc(v.entryTime||nowTime())}">`)}</div>
+    ${field('معاد التسليم المتفق عليه',`<input id="f-due" value="${esc(v.due)}" placeholder="بعد ساعتين / بكرة / بعد يومين">`)}
     ${field('درجة الصعوبة',`<select id="f-diff"><option value="">غير محدد</option>${['سهل','متوسط','صعب'].map(x=>`<option ${v.diff===x?'selected':''}>${x}</option>`).join('')}</select>`)}
     <details class="box sec" style="margin:0"><summary>بيانات الفحص الفني (اختياري)</summary><div class="form" style="margin-top:10px"><div class="g2">${field('سحب الأمبير عند الاستلام',`<input id="f-amp" class="mono" dir="ltr" value="${esc((v.diag||{}).amp)}" placeholder="مثال: 0.45A">`)}${field('اتعرف على الكمبيوتر؟',`<select id="f-det">${['','اتعرف','ما اتعرفش'].map(x=>`<option value="${x}" ${((v.diag||{}).det||'')===x?'selected':''}>${x||'غير محدد'}</option>`).join('')}</select>`)}</div>${field('وقت الشغل على الجهاز (بالدقيقة)',`<input id="f-time" type="number" inputmode="numeric" min="0" value="${v.timeMin??''}">`)}</div></details>
     <label class="chk"><input type="checkbox" id="f-urgent" ${v.urgent?'checked':''}> عاجل جدًا (العميل مستعجل)</label>
@@ -632,11 +643,23 @@ function openDevice(id){
    <div id="devExtra"></div></div>`;
   showModal(html);
   $('#devform').addEventListener('submit',e=>{e.preventDefault();saveDevice();});
+  /* new device: date and time follow the clock until the user edits them by hand */
+  clearInterval(openDevice.t);
+  if(!d){
+    ['f-entry','f-entry-time'].forEach(k=>$('#'+k).addEventListener('input',ev=>{ev.target.dataset.touched='1'}));
+    openDevice.t=setInterval(()=>{
+      const a=$('#f-entry'),b=$('#f-entry-time');
+      if(!a||!b){clearInterval(openDevice.t);return}
+      if(!a.dataset.touched)a.value=today();
+      if(!b.dataset.touched)b.value=nowTime();
+    },15000);
+  }
   refreshDeviceSections();
+  attachMics();
 }
 async function saveDevice(){
   const g=i=>$('#'+i).value.trim();
-  const base={customer:g('f-customer'),phone:g('f-phone'),model:g('f-model'),imei:g('f-imei'),issue:g('f-issue'),receiver:g('f-receiver'),tech:g('f-tech'),entryDate:g('f-entry')||today(),due:g('f-due'),price:num($('#f-price').value),notes:g('f-notes'),urgent:$('#f-urgent').checked,diff:$('#f-diff').value,diag:{amp:g('f-amp'),det:$('#f-det').value},timeMin:num($('#f-time').value)};
+  const base={customer:g('f-customer'),phone:g('f-phone'),model:g('f-model'),imei:g('f-imei'),issue:g('f-issue'),receiver:g('f-receiver'),tech:g('f-tech'),entryDate:(S.modal.id||$('#f-entry').dataset.touched)?(g('f-entry')||today()):today(),entryTime:(S.modal.id||$('#f-entry-time').dataset.touched)?(g('f-entry-time')||nowTime()):nowTime(),due:g('f-due'),price:num($('#f-price').value),notes:g('f-notes'),urgent:$('#f-urgent').checked,diff:$('#f-diff').value,diag:{amp:g('f-amp'),det:$('#f-det').value},timeMin:num($('#f-time').value)};
   if(!base.customer){toast('اكتب اسم العميل');return}
   const id=S.modal.id;
   if(id){
@@ -669,6 +692,9 @@ function refreshDeviceSections(){
   let wend='';
   if(w.on&&w.months&&wstart){const e=parse(wstart);e.setMonth(e.getMonth()+Number(w.months));wend=iso(e)}
   const keep=document.activeElement&&box.contains(document.activeElement)?document.activeElement.id:'';
+  /* remember what was typed so a live-data refresh never wipes an unsaved form */
+  const typed={};
+  box.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{if(el.type!=='checkbox')typed[el.id]=el.value});
   const stock=cache.inventory.filter(i=>num(i.qty)>0);
   box.innerHTML=`
    ${d.status!=='done'?`<button class="btn" data-act="deliver" data-id="${esc(d.id)}" style="width:100%;margin-bottom:12px;padding:14px;font-size:16px">تم التسليم</button>`:`<div class="banner" style="background:var(--good-bg);color:var(--good)"><b>تم التسليم</b> يوم ${dshow(d.deliveredAt)}</div>`}
@@ -704,7 +730,12 @@ function refreshDeviceSections(){
    </div>
    <button class="btn soft" data-act="receipt" style="width:100%;margin-bottom:10px">إيصال للعميل</button>
    <button class="btn danger" data-act="del-dev" style="width:100%">حذف الجهاز</button>`;
+  ['p-name','p-sup','p-price','p-ship','p-sw','p-stock','y-amt','y-method','y-by','y-holder'].forEach(k=>{
+    const el=document.getElementById(k);
+    if(el&&typed[k]!==undefined&&typed[k]!=='')el.value=typed[k];
+  });
   if(keep){const el=document.getElementById(keep);if(el)el.focus()}
+  attachMics();
 }
 async function devPatch(id,data){return safe(()=>patch('devices',id,data))}
 const curDev=()=>devs().find(x=>x.id===(S.modal&&S.modal.id));
@@ -824,7 +855,7 @@ function renderMoney(){
   const R=range();
   const done=devs().filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
   const revenue=done.reduce((s,d)=>s+num(d.price),0);
-  const costs=done.reduce((s,d)=>s+partCost(d),0);
+  const costs=partsLoggedIn(R);
   const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0);
   const expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
   const net=revenue-costs-lossP-expP;
@@ -832,7 +863,7 @@ function renderMoney(){
   const collected=devs().reduce((s,d)=>s+(d.payments||[]).filter(p=>inR(p.date,R)).reduce((a,p)=>a+num(p.amount),0),0);
   $('#report').innerHTML=`<div class="box"><h2>${esc(R.label)}</h2><div class="rows">
     <div class="row"><span>إيراد ${devicesWord(done.length)} اتسلموا</span><span>${money(revenue)}</span></div>
-    <div class="row"><span>قطع الغيار والشحن</span><span class="crit">− ${money(costs)}</span></div>
+    <div class="row"><span>قطع الغيار والشحن (اللي اتسجلت في الفترة)</span><span class="crit">− ${money(costs)}</span></div>
     <div class="row"><span>خسائر صيانة</span><span class="crit">− ${money(lossP)}</span></div>
     <div class="row"><span>مصاريف تشغيلية</span><span class="crit">− ${money(expP)}</span></div>
     <div class="row total"><span>صافي الربح</span><span class="${net>=0?'good':'crit'}">${money(net)}</span></div>
@@ -923,7 +954,51 @@ function renderSettings(){
 
 /* ---------- modal ---------- */
 function showModal(html){ $('#modal').innerHTML=`<div class="veil" data-act="veil">${html}</div>`; const f=$('#modal input,#modal select'); }
-function closeModal(){ $('#modal').innerHTML=''; S.modal=null; }
+function closeModal(){ $('#modal').innerHTML=''; S.modal=null; clearInterval(openDevice.t); if(typeof stopMic==='function')stopMic(); }
+
+/* ---------- per-field voice input (a mic next to each field) ---------- */
+const MIC_SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const MIC_WORDS={'صفر':'0','زيرو':'0','zero':'0','واحد':'1','واحدة':'1','one':'1','اتنين':'2','اثنين':'2','إثنين':'2','two':'2','تلاتة':'3','ثلاثة':'3','تلات':'3','three':'3','اربعة':'4','أربعة':'4','أربع':'4','four':'4','خمسة':'5','خمس':'5','five':'5','ستة':'6','ست':'6','six':'6','سبعة':'7','سبع':'7','seven':'7','تمانية':'8','ثمانية':'8','تمن':'8','eight':'8','تسعة':'9','تسع':'9','nine':'9'};
+function micDigits(t){return t.replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g,c=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(c))}
+function micValue(el,raw){
+  let t=micDigits(String(raw||'').trim());
+  if(el.type==='tel'||el.type==='number'||el.inputMode==='numeric'||el.inputMode==='decimal'){
+    t=t.split(/\s+/).map(w=>{const k=w.toLowerCase();return Object.prototype.hasOwnProperty.call(MIC_WORDS,k)?MIC_WORDS[k]:w}).join(' ');
+    t=t.replace(/(?<=\d)\s+(?=\d)/g,'').replace(/[^\d.\-]/g,'');
+  }
+  return t;
+}
+let micActive=null;
+function stopMic(){ if(micActive){try{micActive.rec.stop()}catch(e){} micActive=null} document.querySelectorAll('.mic.on').forEach(b=>b.classList.remove('on')); }
+function startMic(btn){
+  const el=btn.previousElementSibling; if(!el||!MIC_SR)return;
+  if(micActive&&micActive.btn===btn){stopMic();return}
+  stopMic();
+  const rec=new MIC_SR(); rec.lang='ar-EG'; rec.interimResults=false; rec.maxAlternatives=1;
+  micActive={rec,btn}; btn.classList.add('on');
+  rec.onresult=ev=>{
+    const txt=micValue(el,Array.from(ev.results).map(r=>r[0].transcript).join(' '));
+    if(!txt)return;
+    el.value=(el.tagName==='TEXTAREA'&&el.value?el.value+' ':'')+txt;
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  rec.onerror=ev=>{ stopMic(); toast(ev.error==='not-allowed'||ev.error==='service-not-allowed'?'اسمح للمتصفح باستخدام المايك':'مسمعتش كويس، جرب تاني'); };
+  rec.onend=()=>{ if(micActive&&micActive.btn===btn)stopMic(); };
+  try{rec.start()}catch(e){stopMic()}
+}
+function attachMics(){
+  if(!MIC_SR)return;
+  ['f-customer','f-phone','f-model','f-imei','f-issue','f-receiver','f-tech','f-due','f-price','f-notes','p-name','p-sup','p-price','p-ship','y-amt','y-by'].forEach(k=>{
+    const el=document.getElementById(k);
+    if(!el||el.parentElement.classList.contains('mw'))return;
+    const w=document.createElement('span'); w.className='mw';
+    el.parentElement.insertBefore(w,el); w.appendChild(el);
+    const b=document.createElement('button'); b.type='button'; b.className='mic'; b.setAttribute('aria-label','تسجيل صوتي للخانة دي');
+    b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>';
+    w.appendChild(b);
+  });
+}
+document.addEventListener('click',e=>{const m=e.target.closest('.mic'); if(m){e.preventDefault();startMic(m)}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.modal)closeModal()});
 
 /* ---------- events ---------- */
@@ -969,12 +1044,16 @@ document.addEventListener('click',async e=>{
   if(act==='add-part'&&d){
     const name=$('#p-name').value.trim(); if(!name){toast('اكتب اسم القطعة');return}
     const part={id:'p'+Date.now().toString(36),name,supplier:$('#p-sup').value.trim(),price:num($('#p-price').value),shipping:num($('#p-ship').value),date:today(),sw:num($('#p-sw').value)};
-    await devPatch(d.id,{parts:[...(d.parts||[]),part]}); return;
+    const bk=['p-name','p-sup','p-price','p-ship','p-sw'].map(k=>[k,$('#'+k).value]);
+    bk.forEach(([k])=>{$('#'+k).value=''});   /* clear first so a live refresh can't bring the old text back */
+    const ok=await devPatch(d.id,{parts:[...(d.parts||[]),part]});
+    if(!ok)bk.forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v});
+    return;
   }
   if(act==='add-stock-part'&&d){
     const it=cache.inventory.find(x=>x.id===$('#p-stock').value);
     if(!it||num(it.qty)<1){toast('القطعة دي خلصت من المخزون');return}
-    const part={id:'p'+Date.now().toString(36),name:it.name+(it.model?' - '+it.model:''),supplier:it.supplier||'',price:num(it.buyPrice),shipping:0,stockId:it.id,fromStock:true};
+    const part={id:'p'+Date.now().toString(36),name:it.name+(it.model?' - '+it.model:''),supplier:it.supplier||'',price:num(it.buyPrice),shipping:0,stockId:it.id,fromStock:true,date:today()};
     if(await devPatch(d.id,{parts:[...(d.parts||[]),part]})) await safe(()=>patch('inventory',it.id,{qty:num(it.qty)-1}));
     return;
   }
@@ -1086,11 +1165,11 @@ function renderDash(){
   const ready=ds.filter(d=>d.status==='ready'||d.status==='hold').length;
   const stale=ds.filter(isStale).length;
   const doneToday=ds.filter(d=>d.status==='done'&&d.deliveredAt===t);
-  const profit=doneToday.reduce((s,d)=>s+num(d.price)-partCost(d),0);
+  const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-partsLoggedIn({from:t,to:t});
   let sw=0; ds.forEach(d=>(d.parts||[]).forEach(p=>{const i=swInfo(p); if(i&&i.left>=0&&i.left<=7)sw++}));
   const low=cache.inventory.filter(i=>num(i.min)>0&&num(i.qty)<=num(i.min)).length;
   const st=(n,l,cls)=>`<div class="stat"><b class="${cls||''}">${n}</b><span>${l}</span></div>`;
-  let h=`<div class="dash">${st(ready,'جاهز للتسليم')}${st(stale,'متأخر',stale?'crit':'')}${st(doneToday.length,'اتسلم النهاردة')}${isAdmin?st(fmt(profit),'ربح النهاردة (قبل المصاريف)',profit>=0?'good':'crit'):''}${sw?st(sw,'ضمان تاجر قرب ينتهي','crit'):''}${low?st(low,'قطع مخزون قليل','crit'):''}</div>`;
+  let h=`<div class="dash">${st(ready,'جاهز للتسليم')}${st(stale,'متأخر',stale?'crit':'')}${st(doneToday.length,'اتسلم النهاردة')}${isAdmin?st(fmt(profit),'ربح النهاردة بعد قطع الغيار (قبل المصاريف)',profit>=0?'good':'crit'):''}${sw?st(sw,'ضمان تاجر قرب ينتهي','crit'):''}${low?st(low,'قطع مخزون قليل','crit'):''}</div>`;
   if(isAdmin){
     let last=0; try{last=Number(localStorage.getItem('rc_last_backup')||0)}catch(e){}
     if(!last||(Date.now()-last)/864e5>30)h+=`<div class="banner">عدّى أكتر من 30 يوم من آخر نسخة احتياطية للبيانات. <div class="links"><button data-tab="set">افتح الإعدادات وحمّل نسخة</button></div></div>`;
@@ -1286,7 +1365,7 @@ function renderMoneyExtra(){
 function openMonthReport(){
   const R=monthRangeOf(S.ref); S.modal={type:'report'};
   const done=devs().filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
-  const revenue=done.reduce((s,d)=>s+num(d.price),0), costs=done.reduce((s,d)=>s+partCost(d),0);
+  const revenue=done.reduce((s,d)=>s+num(d.price),0), costs=partsLoggedIn(R);
   const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0), expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
   const net=revenue-costs-lossP-expP;
   const mv=slist('payroll','moves').filter(m=>inR(m.date,R)), mem=slist('payroll','members');
