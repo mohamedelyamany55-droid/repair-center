@@ -112,7 +112,7 @@ label.chk input{width:20px;height:20px;accent-color:var(--accent)}
 
 .nav{position:fixed;inset-inline:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
 .nav-in{display:flex;width:100%;max-width:760px}
-.tab{flex:1;background:none;border:0;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;color:var(--muted);font-size:12px;cursor:pointer}
+.tab{position:relative;flex:1;background:none;border:0;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;color:var(--muted);font-size:12px;cursor:pointer}
 .tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--accent);font-weight:600}
 
@@ -194,7 +194,7 @@ a.btn{text-decoration:none;display:inline-block}
 </style>
 
 <div id="app" dir="rtl">
-  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v2.0</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
+  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v2.0.1</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
   <div id="localbar"></div>
   <main id="view"></main>
 </div>
@@ -379,7 +379,14 @@ async function loadAll(){
   }
   if(busy>0)return;
   setBar('');
-  COLS.forEach(c=>cache[c]=[]); all.forEach(applyRow); renderData();
+  COLS.forEach(c=>cache[c]=[]); all.forEach(applyRow);
+  if(isAdmin){
+    /* new sign-up request arrived: tell the admin right away, on any tab */
+    const pend=cache.members.filter(m=>!m.approved&&!m.disabled).length;
+    if(S.lastPend!==undefined&&pend>S.lastPend){ toast(pend===1?'فيه طلب تسجيل جديد مستنيك في الإعدادات':'فيه '+pend+' طلبات تسجيل مستنية في الإعدادات',8000); try{navigator.vibrate&&navigator.vibrate(200)}catch(e){} }
+    S.lastPend=pend; buildNav();
+  }
+  renderData();
 }
 function startPoll(){ stopPoll(); pollT=setInterval(()=>{ if(!document.hidden)loadAll(); },POLL_MS); }
 function stopPoll(){ if(pollT){clearInterval(pollT);pollT=null} }
@@ -528,7 +535,8 @@ const ICONS={
 function buildNav(){
   const items=[['devices','الأجهزة'],['stock','المخزون'],['kb','المرجع'],['att','الحضور']];
   items.push(['money','الحسابات']);if(isAdmin)items.push(['set','الإعدادات']);else items.push(['me','أدائي'])
-  $('#nav').innerHTML=items.map(([k,l])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}</button>`).join('');
+  const pend=isAdmin?cache.members.filter(m=>!m.approved&&!m.disabled).length:0;
+  $('#nav').innerHTML=items.map(([k,l])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}${k==='set'&&pend?`<span class="pill urgent" style="position:absolute;top:2px;margin-inline-start:22px">${pend}</span>`:''}</button>`).join('');
 }
 
 /* ---------- tabs ---------- */
@@ -569,7 +577,7 @@ function renderData(){
   else if(S.tab==='me')renderMe();
   else if(S.tab==='att')renderAtt();
   else renderSettings();
-  if(S.modal&&S.modal.type==='device'&&S.modal.id)refreshDeviceSections();
+  if(S.modal&&S.modal.type==='device'&&S.modal.id&&!micActive)refreshDeviceSections();
 }
 
 /* ----- devices ----- */
@@ -1050,17 +1058,37 @@ function startMic(btn){
   const el=btn.previousElementSibling; if(!el||!MIC_SR)return;
   if(micActive&&micActive.btn===btn){stopMic();return}
   stopMic();
+  micRun(btn,el,0);
+}
+/* one recording attempt. On iPhone the very first start can die right after the system permission dialog,
+   so if it ends almost instantly with nothing heard (and no real error) it is restarted once, silently. */
+function micRun(btn,el,attempt){
   const rec=new MIC_SR(); rec.lang='ar-EG'; rec.interimResults=false; rec.maxAlternatives=1;
   micActive={rec,btn}; btn.classList.add('on');
+  const t0=Date.now(); let got=false, err='';
+  const mine=()=>micActive&&micActive.rec===rec;
   rec.onresult=ev=>{
+    got=true;
     const txt=micValue(el,Array.from(ev.results).map(r=>r[0].transcript).join(' '));
     if(!txt)return;
     el.value=(el.tagName==='TEXTAREA'&&el.value?el.value+' ':'')+txt;
     el.dispatchEvent(new Event('input',{bubbles:true}));
   };
-  rec.onerror=ev=>{ stopMic(); toast(ev.error==='not-allowed'||ev.error==='service-not-allowed'?'اسمح للمتصفح باستخدام المايك':'مسمعتش كويس، جرب تاني'); };
-  rec.onend=()=>{ if(micActive&&micActive.btn===btn)stopMic(); };
-  try{rec.start()}catch(e){stopMic()}
+  rec.onerror=ev=>{ err=ev.error||'error'; };
+  rec.onend=()=>{
+    if(!mine())return;
+    const quick=Date.now()-t0<1500;
+    if(!got&&quick&&attempt<1&&(!err||err==='aborted'||err==='no-speech')){
+      micActive=null; setTimeout(()=>{ if(!micActive&&btn.isConnected&&el.isConnected)micRun(btn,el,attempt+1) },250); return;
+    }
+    stopMic();
+    if(got)return;
+    if(err==='not-allowed'||err==='service-not-allowed')toast('المايك مش مسموح. اسمح للموقع باستخدام المايك من إعدادات سفاري (aA ← إعدادات الموقع ← الميكروفون ← سماح)',8000);
+    else if(err==='language-not-supported')toast('الموبايل ده مش بيدعم الإملاء بالعربي المصري');
+    else if(err==='network')toast('التسجيل الصوتي محتاج اتصال بالنت');
+    else toast('مسمعتش حاجة، دوس المايك واتكلم على طول'+(err?' ('+err+')':''));
+  };
+  try{rec.start()}catch(e){ if(mine())micActive=null; btn.classList.remove('on'); toast('التسجيل مانفعش، جرب تاني ('+((e&&e.name)||'error')+')'); }
 }
 const MIC_SKIP=new Set(['hidden','checkbox','radio','file','password','date','time','datetime-local','month','week','range','color','button','submit','reset','image','email','url']);
 function attachMics(root){
@@ -1882,7 +1910,9 @@ async function memberStatus(create){
   if(!m){
     if(!create)return 'removed';
     const email=session.user.email||'', name=session.user.name||email.split('@')[0]||'';
-    try{ await http('/rest/v1/docs?on_conflict=collection,id',{method:'POST',body:{collection:'members',id:uid,data:{email,name,approved:false,createdAt:Date.now()}},headers:{Prefer:'resolution=merge-duplicates,return=minimal'}}); }catch(e){}
+    /* the request must really be saved, otherwise the admin never sees it: report a failure instead of pretending it was sent */
+    try{ await http('/rest/v1/docs?on_conflict=collection,id',{method:'POST',body:{collection:'members',id:uid,data:{email,name,approved:false,createdAt:Date.now()}},headers:{Prefer:'resolution=merge-duplicates,return=minimal'}}); }
+    catch(e){ console.warn(e); memberStatus.lastErr=(e&&(e.code||e.message))||'error'; return e&&e.code==='network'?'neterr':'error'; }
     return 'pending';
   }
   if(m.disabled)return 'disabled';
@@ -1895,7 +1925,9 @@ function showGate(st){
   const L=$('#login'); L.hidden=false;
   const t={pending:['طلبك في انتظار الموافقة','طلب التسجيل وصل للأدمن. أول ما يوافق عليه تقدر تدخل. افتح الصفحة تاني أو دوس "تحديث".'],
     disabled:['الحساب موقوف','الأدمن أوقف الحساب ده. كلّمه لو عايز تدخل تاني.'],
-    removed:['الحساب مش موجود','الحساب ده اتحذف أو لسه مش متسجل. سجّل خروج وجرّب تسجّل من جديد.']}[st]||['مش مسموح','كلّم الأدمن.'];
+    removed:['الحساب مش موجود','الحساب ده اتحذف أو لسه مش متسجل. سجّل خروج وجرّب تسجّل من جديد.'],
+    neterr:['مفيش اتصال بالنت','مقدرتش أبعت طلب التسجيل للأدمن. اتأكد من النت ودوس "تحديث".'],
+    error:['طلبك ماوصلش للأدمن','حصلت مشكلة وطلب التسجيل ماتسجلش، فالأدمن مش هيشوفه. بلّغ الأدمن بالرسالة دي: '+esc(String(memberStatus.lastErr||''))]}[st]||['مش مسموح','كلّم الأدمن.'];
   L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:8px">${t[0]}</div><div class="muted" style="margin-bottom:14px">${t[1]}</div>
    <button class="btn" type="button" data-act="gate-refresh">تحديث</button>
    <button class="btn soft" type="button" data-act="logout" style="margin-top:8px">تسجيل خروج</button></div></div>`;
