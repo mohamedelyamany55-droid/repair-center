@@ -564,7 +564,7 @@ const finSettings=()=>cache.fin_settings.find(x=>x.id==='main')||{};
 const alertDays=()=>{const n=Number(settings().alertDays);return n>0?n:7};
 const priHigh=()=>{const n=Number(settings().priHigh);return n>0?n:500};
 const priMid=()=>{const n=Number(settings().priMid);return n>0?n:200};
-const teamNames=()=>settings().team||[];
+const teamNames=()=>[...new Set([...(settings().team||[]),...cache.members.filter(m=>m.approved&&!m.disabled).map(m=>(m.name||'').trim()).filter(Boolean)])];
 const devs=()=>cache.devices;
 const partCost=d=>(d.parts||[]).reduce((s,p)=>s+num(p.price)+num(p.shipping),0);
 /* a part is deducted from profit on the day it was logged (older parts without a date fall back to the device's dates) */
