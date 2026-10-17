@@ -191,10 +191,45 @@ details.sec[open]>summary{margin-bottom:10px}
 .stat span{font-size:12px;color:var(--muted)}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 a.btn{text-decoration:none;display:inline-block}
+
+/* v2.1: logo, tiles, bars, group sheet, appearance, motion */
+.brand{display:flex;align-items:center}
+.logo{width:30px;height:30px;color:var(--accent);flex:none;margin-inline-end:8px}
+.loginwrap .brand .logo{width:34px;height:34px}
+.bar{height:10px;background:var(--surface2);border-radius:999px;overflow:hidden;margin-top:6px}
+.bar>i{display:block;height:100%;min-width:4px;background:var(--accent);border-radius:999px;transition:width .5s ease}
+.bar.alt>i{background:var(--info)}
+.brow{padding:9px 0;border-bottom:1px solid var(--line)}
+.brow:last-child{border-bottom:0}
+.brow .top2{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:10px}
+button.tile{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:start;display:grid;gap:2px;cursor:pointer;color:var(--ink)}
+button.tile b{font-size:24px;font-family:var(--f-mono);direction:ltr;text-align:start;line-height:1.2}
+button.tile span{font-size:12px;color:var(--muted)}
+button.tile.warn b{color:var(--crit)}
+button.tile:active{transform:scale(.97)}
+button.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grow{padding:10px 0;border-bottom:1px solid var(--line)}
+.grow:last-child{border-bottom:0}
+.grow .gh{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.grow .gs{font-size:13px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.grow .ga{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.grow details{margin-top:8px}
+.grow details>summary{cursor:pointer;color:var(--accent);font-size:13px}
+.by{font-size:12px;color:var(--muted)}
+.swatch{display:inline-block;width:14px;height:14px;border-radius:50%;margin-inline-end:6px;vertical-align:-2px;border:1px solid rgba(0,0,0,.2)}
+@media (prefers-reduced-motion:no-preference){
+  body,.box,.card,.stat,.sheet,.nav,.chip,.btn,.search,.item,.tile{transition:background-color .25s ease,color .25s ease,border-color .25s ease}
+  .sheet{animation:sheetup .22s ease-out}
+  @keyframes sheetup{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}
+  .list>.card{animation:fadein .25s ease-out both}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+}
+
 </style>
 
 <div id="app" dir="rtl">
-  <div class="top"><div class="brand">متابعة المركز</div><div class="right"><span class="ver">v2.0.1</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
+  <div class="top"><div class="brand"><svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="currentColor"/><text x="24" y="33" text-anchor="middle" font-size="24" font-weight="800" style="fill:var(--accent-ink)" font-family="Arial,sans-serif">4G</text></svg>متابعة المركز</div><div class="right"><span class="ver">v2.1</span><button class="btn ghost sm" data-act="account" type="button">حسابي</button></div></div>
   <div id="localbar"></div>
   <main id="view"></main>
 </div>
@@ -225,6 +260,44 @@ const dshow=s=>{if(!s)return '—';const [y,m,d]=s.split('-');return `${+d}/${+m
 const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0};
 function devicesWord(n){return n===1?'جهاز واحد':n===2?'جهازان':n<=10?`${n} أجهزة`:`${n} جهاز`}
+
+/* ---------- appearance (saved on each device): accent color, light/dark, font ---------- */
+const LOGO='<svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="currentColor"/><text x="24" y="33" text-anchor="middle" font-size="24" font-weight="800" style="fill:var(--accent-ink)" font-family="Arial,sans-serif">4G</text></svg>';
+const PREF_KEY='rc_prefs_v1';
+const PAL={
+ green:{n:'أخضر',l:['#0D6A57','#D4EBE4','#FFFFFF'],d:['#4CC7A4','#1B3A31','#08201A']},
+ blue:{n:'أزرق',l:['#1F5FA8','#D6E6F7','#FFFFFF'],d:['#7DB2EE','#1B2F47','#0B1B2E']},
+ red:{n:'أحمر',l:['#B3302A','#F8D9D5','#FFFFFF'],d:['#F08177','#432120','#2A0B09']},
+ purple:{n:'بنفسجي',l:['#6B3FA0','#E6DAF3','#FFFFFF'],d:['#B79AE6','#2E2147','#1A0F2E']},
+ orange:{n:'برتقالي',l:['#B55A0A','#FAE3CC','#FFFFFF'],d:['#F0A45A','#43290F','#2A1604']},
+ slate:{n:'رمادي',l:['#3F4D4A','#E2E8E6','#FFFFFF'],d:['#A9BAB5','#26332F','#101816']}
+};
+const FONTS={
+ def:{n:'الافتراضي',b:"'IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif",d:"'Reem Kufi','Segoe UI',Tahoma,sans-serif"},
+ sys:{n:'خط الجهاز',b:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Arabic',Tahoma,sans-serif",d:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Arabic',Tahoma,sans-serif"},
+ tah:{n:'تاهوما',b:"Tahoma,'Geeza Pro',Arial,sans-serif",d:"Tahoma,'Geeza Pro',Arial,sans-serif"},
+ naskh:{n:'نسخ',b:"'Geeza Pro','Noto Naskh Arabic','Traditional Arabic','Times New Roman',serif",d:"'Geeza Pro','Noto Naskh Arabic','Traditional Arabic','Times New Roman',serif"},
+ kufi:{n:'كوفي',b:"'Segoe UI',Tahoma,sans-serif",d:"'Reem Kufi','Noto Kufi Arabic','Geeza Pro','Segoe UI',Tahoma,sans-serif"}
+};
+let PREFS={color:'green',mode:'auto',font:'def'};
+try{Object.assign(PREFS,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
+const darkMQ=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
+function applyPrefs(){
+  const r=document.documentElement;
+  const dark=PREFS.mode==='dark'||(PREFS.mode==='auto'&&!!(darkMQ&&darkMQ.matches));
+  if(PREFS.mode==='auto')r.removeAttribute('data-theme'); else r.setAttribute('data-theme',PREFS.mode);
+  const p=(PAL[PREFS.color]||PAL.green)[dark?'d':'l'];
+  r.style.setProperty('--accent',p[0]); r.style.setProperty('--accent-soft',p[1]); r.style.setProperty('--accent-ink',p[2]);
+  const f=FONTS[PREFS.font]||FONTS.def;
+  r.style.setProperty('--f-body',f.b); r.style.setProperty('--f-display',f.d);
+}
+function setPref(k,v){
+  PREFS[k]=v; try{localStorage.setItem(PREF_KEY,JSON.stringify(PREFS))}catch(e){}
+  applyPrefs();
+  document.querySelectorAll('[data-pref]').forEach(x=>x.classList.toggle('on',PREFS[x.dataset.pref]===x.dataset.v));
+}
+if(darkMQ&&darkMQ.addEventListener)darkMQ.addEventListener('change',()=>{if(PREFS.mode==='auto')applyPrefs()});
+applyPrefs();
 
 const ST=[
  {k:'wait',l:'في الانتظار',c:'st-wait'},
@@ -400,7 +473,7 @@ function handleSignedOut(msg){
 function showLogin(msg){
   $('#app').hidden=true; $('.nav').hidden=true;
   const L=$('#login'); L.hidden=false;
-  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:4px">متابعة المركز</div><div class="muted" style="margin-bottom:14px">سجّل دخولك بالإيميل والباسورد اللي اتعملولك</div>
+  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:4px">${LOGO}متابعة المركز</div><div class="muted" style="margin-bottom:14px">سجّل دخولك بالإيميل والباسورد اللي اتعملولك</div>
    <form class="form" id="loginform" autocomplete="on">
     ${field('الإيميل','<input id="l-email" type="email" name="email" autocomplete="username" dir="ltr" inputmode="email" required>')}
     ${field('الباسورد','<input id="l-pass" type="password" name="password" autocomplete="current-password" dir="ltr" required>')}
@@ -442,7 +515,7 @@ function openAccount(){
   const email=(session&&session.user&&session.user.email)||'';
   showModal(`<div class="sheet" role="dialog" aria-modal="true"><div class="hd"><h2>حسابي</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
    <div class="box"><div class="rows"><div class="row"><span>الإيميل</span><span class="mono">${esc(email)}</span></div><div class="row"><span>الصلاحية</span><span>${isAdmin?'مدير':'فريق'}</span></div></div></div>
-   <h3>تغيير الباسورد</h3>
+   ${appearanceHtml()}<h3>تغيير الباسورد</h3>
    <form class="form" id="pwform" autocomplete="off">
     ${field('الباسورد الحالي','<input id="pw-old" type="password" autocomplete="current-password" dir="ltr" required>')}
     ${field('الباسورد الجديد (6 على الأقل)','<input id="pw-new" type="password" autocomplete="new-password" dir="ltr" minlength="6" required>')}
@@ -536,7 +609,7 @@ function buildNav(){
   const items=[['devices','الأجهزة'],['stock','المخزون'],['kb','المرجع'],['att','الحضور']];
   items.push(['money','الحسابات']);if(isAdmin)items.push(['set','الإعدادات']);else items.push(['me','أدائي'])
   const pend=isAdmin?cache.members.filter(m=>!m.approved&&!m.disabled).length:0;
-  $('#nav').innerHTML=items.map(([k,l])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}${k==='set'&&pend?`<span class="pill urgent" style="position:absolute;top:2px;margin-inline-start:22px">${pend}</span>`:''}</button>`).join('');
+  $('#nav').innerHTML=items.map(([k,l])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${l}${k==='set'&&pend?`<span class="pill urgent" style="position:absolute;top:3px;inset-inline-start:calc(50% + 6px);font-size:11px;padding:0 6px">${pend}</span>`:''}</button>`).join('');
 }
 
 /* ---------- tabs ---------- */
@@ -552,7 +625,7 @@ function renderTab(){
       <div class="chips" id="cchips"></div><div id="stocksum"></div><div class="box" id="stocklist"></div>
       <div class="box"><h3>مقارنة أسعار التجار</h3><input class="search" id="pc-q" type="search" placeholder="اسم القطعة (مثال: شاشة A52)" style="width:100%"><div id="pcres" style="margin-top:8px"></div></div><div id="quotes"></div><div id="rets"></div>`;
   } else if(S.tab==='money'){
-    if(!isAdmin){v.innerHTML=`<div id="incomes"></div><div id="exps"></div><div id="debts"></div><div id="tools"></div>`;}
+    if(!isAdmin){v.innerHTML=`<div id="flow"></div><div id="incomes"></div><div id="exps"></div><div id="losses"></div><div id="debts"></div><div id="tools"></div>`;}
     else v.innerHTML=`<div class="seg" id="seg"></div>
       <div class="datebar"><span>التاريخ المرجعي</span><input class="search" id="ref" type="date" style="flex:none" value="${S.ref}"></div>
       <div class="acts"><button class="btn soft" data-act="monthly-report">تقرير الشهر للطباعة</button></div><div id="report"></div><div id="balance"></div><div id="incomes"></div><div id="payroll"></div><div id="debts"></div><div id="tools"></div><div id="stats"></div><div id="msgs"></div><div id="exps"></div><div id="losses"></div>`;
@@ -578,6 +651,7 @@ function renderData(){
   else if(S.tab==='att')renderAtt();
   else renderSettings();
   if(S.modal&&S.modal.type==='device'&&S.modal.id&&!micActive)refreshDeviceSections();
+  if(S.modal&&S.modal.type==='group')refreshGroup();
 }
 
 /* ----- devices ----- */
@@ -638,7 +712,7 @@ function devCard(d){
     <div class="r"><span class="tag">#${String(d.no||0).padStart(4,'0')}</span><span class="pill ${st.c}">${st.l}</span></div>
     ${badges}<div class="cust">${esc(d.customer||'بدون اسم')}</div>
     <div class="sub">${esc(d.model||'')}${d.issue?' · '+esc(d.issue):''}</div>
-    <div class="meta"><span>التسليم: ${esc(d.due||'—')}</span><span>الفني: ${esc(d.tech||'—')}</span><span class="price">${money(d.price)}</span></div>
+    <div class="meta"><span>التسليم: ${esc(d.due||'—')}</span><span>الفني: ${esc(d.tech||'—')}</span>${num(d.price)>0?`<span>مدفوع ${fmt(paidOf(d))} · متبقي ${fmt(Math.max(0,num(d.price)-paidOf(d)))}</span>`:''}${warrantyEnd(d)&&warrantyEnd(d)>=today()?`<span>ضمان لحد ${dshow(warrantyEnd(d))}</span>`:''}${d.addedBy?`<span>سجّله ${esc(d.addedBy)}</span>`:''}<span class="price">${money(d.price)}</span></div>
     ${isStale(d)?`<div class="stale">من ${staleDays(d)} يوم من غير تحديث</div>`:''}
   </button>`;
 }
@@ -699,7 +773,7 @@ async function saveDevice(){
     const no=devs().reduce((m,d)=>Math.max(m,d.no||0),0)+1;
     const nid=newId('devices');
     const now=Date.now();
-    const ok=await safe(()=>put('devices',nid,{...base,no,status:'wait',createdAt:now,statusAt:now,deliveredAt:'',parts:[],payments:[],warranty:{on:false,months:0,start:''}}));
+    const ok=await safe(()=>put('devices',nid,{...base,no,status:'check',addedBy:byWho(),createdAt:now,statusAt:now,deliveredAt:'',parts:[],payments:[],warranty:{on:false,months:0,start:''}}));
     if(ok){toast('اتسجل الجهاز'); S.modal={type:'device',id:nid}; openDevice(nid);}
   }
 }
@@ -729,7 +803,7 @@ function refreshDeviceSections(){
   const stock=cache.inventory.filter(i=>num(i.qty)>0);
   box.innerHTML=`
    ${d.status!=='done'?`<button class="btn" data-act="deliver" data-id="${esc(d.id)}" style="width:100%;margin-bottom:12px;padding:14px;font-size:16px">تم التسليم</button>`:`<div class="banner" style="background:var(--good-bg);color:var(--good)"><b>تم التسليم</b> يوم ${dshow(d.deliveredAt)}</div>`}
-   <h3>حالة الجهاز</h3>
+   ${d.addedBy?`<div class="by" style="margin-bottom:8px">اتسجل بواسطة ${esc(d.addedBy)}${d.statusBy?' · آخر تغيير حالة: '+esc(d.statusBy):''}</div>`:''}<h3>حالة الجهاز</h3>
    <div class="chips" style="flex-wrap:wrap;overflow:visible">${ST.map(s=>`<button class="chip ${d.status===s.k?'on':''}" data-act="set-status" data-k="${s.k}">${s.l}</button>`).join('')}</div>
    ${devSummary(d)}
    ${devExtraSections(d)}
@@ -741,7 +815,7 @@ function refreshDeviceSections(){
    </div>
    <h3>قطع الغيار</h3>
    <div class="box">
-    ${(d.parts||[]).length?`<div>${d.parts.map(p=>`<div class="item"><div class="t"><b>${esc(p.name)}</b><div>${p.fromStock?'من المخزون':esc(p.supplier||'بدون تاجر')} · ${money(num(p.price))}${num(p.shipping)?` + شحن ${money(p.shipping)}`:''}${swText(p)}</div></div><button class="btn sm danger" data-act="del-part" data-pid="${esc(p.id)}">حذف</button></div>`).join('')}</div>`:'<div class="hint" style="margin-bottom:8px">لسه ماتضافتش قطع على الجهاز ده.</div>'}
+    ${(d.parts||[]).length?`<div>${d.parts.map(p=>`<div class="item"><div class="t"><b>${esc(p.name)}</b><div>${p.fromStock?'من المخزون':esc(p.supplier||'بدون تاجر')} · ${money(num(p.price))}${num(p.shipping)?` + شحن ${money(p.shipping)}`:''}${swText(p)}${p.by?' · '+esc(p.by):''}</div></div><button class="btn sm danger" data-act="del-part" data-pid="${esc(p.id)}">حذف</button></div>`).join('')}</div>`:'<div class="hint" style="margin-bottom:8px">لسه ماتضافتش قطع على الجهاز ده.</div>'}
     <div class="form" style="margin-top:10px">
      <div class="g2">${field('اسم القطعة','<input id="p-name" placeholder="شاشة / بطارية / آي سي">')}${field('التاجر','<input id="p-sup" list="dl-suppliers">')}</div>
      <div class="g2">${field('السعر (ج)','<input id="p-price" type="number" inputmode="decimal" step="any" min="0">')}${field('الشحن / المواصلات (ج)','<input id="p-ship" type="number" inputmode="decimal" step="any" min="0">')}</div>
@@ -752,7 +826,7 @@ function refreshDeviceSections(){
    </div>
    <h3>الدفع</h3>
    <div class="box">
-    ${(d.payments||[]).length?`<div>${d.payments.map(p=>`<div class="item"><div class="t"><b>${money(p.amount)}</b><div>${esc(p.method)} · استلمها ${esc(p.receivedBy||'—')} · الفلوس عند ${esc(p.holder||DRAWER)} · ${dshow(p.date)}</div></div><button class="btn sm danger" data-act="del-pay" data-pid="${esc(p.id)}">حذف</button></div>`).join('')}</div>`:'<div class="hint" style="margin-bottom:8px">مفيش دفعات متسجلة.</div>'}
+    ${(d.payments||[]).length?`<div>${d.payments.map(p=>`<div class="item"><div class="t"><b>${money(p.amount)}</b><div>${esc(p.method)} · استلمها ${esc(p.receivedBy||'—')} · الفلوس عند ${esc(p.holder||DRAWER)} · ${dshow(p.date)}${p.by?' · سجّلها '+esc(p.by):''}</div></div><button class="btn sm danger" data-act="del-pay" data-pid="${esc(p.id)}">حذف</button></div>`).join('')}</div>`:'<div class="hint" style="margin-bottom:8px">مفيش دفعات متسجلة.</div>'}
     <div class="form" style="margin-top:10px">
      <div class="g2">${field('المبلغ (ج)',`<input id="y-amt" type="number" inputmode="decimal" step="any" min="0" value="${Math.max(0,num(d.price)-paidOf(d))||''}">`)}${field('طريقة الدفع',`<select id="y-method">${METHODS.map(m=>`<option>${m}</option>`).join('')}</select>`)}</div>
      <div class="g2">${field('مين استلم الفلوس','<input id="y-by" list="dl-people">')}${field('الفلوس دلوقتي عند / على محفظة مين',`<input id="y-holder" list="dl-holders" value="${DRAWER}">`)}</div>
@@ -866,7 +940,7 @@ function openItem(id){
       qty+=add; data.qty=qty; data.spent=num(i.spent)+add*price;
       if(await safe(()=>patch('inventory',i.id,data))){closeModal();toast('اتحفظ')}
     }else{
-      data.qty=qty; data.spent=qty*price; data.createdAt=Date.now();
+      data.qty=qty; data.spent=qty*price; data.createdAt=Date.now(); data.by=byWho();
       if(await safe(()=>put('inventory',newId('inventory'),data))){closeModal();toast('اتضافت للمخزون')}
     }
   });
@@ -927,33 +1001,31 @@ function renderMoney(){
    </div>`;
 
   renderExps(); {const el=$('#incomes'); if(el)el.innerHTML=incomesHtml();}
-  const ls=[...cache.losses].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40);
-  $('#losses').innerHTML=`<div class="box"><div class="head"><h2 style="margin:0">خسائر صيانة</h2><button class="btn sm" data-act="new-loss">+ خسارة</button></div>
-   ${ls.length?ls.map(l=>{const d=devs().find(x=>x.id===l.deviceId);return `<div class="item"><div class="t"><b>${esc(l.reason||'بدون سبب')}</b><div>${dshow(l.date)}${d?' · '+esc(d.customer||'')+' '+esc(d.model||''):''}</div></div><span class="crit">${money(l.amount)}</span><button class="btn sm danger" data-act="del-loss" data-id="${esc(l.id)}">حذف</button></div>`}).join(''):'<div class="hint">شاشة اتكسرت وانت بتركبها، أو تعويض عميل؟ سجله هنا عشان يتخصم من الربح.</div>'}</div>`;
+  $('#losses').innerHTML=lossesHtml();
 }
 function renderExps(){
   const ex=[...cache.expenses].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40);
   $('#exps').innerHTML=`<div class="box"><div class="head"><h2 style="margin:0">مصاريف المكان</h2><button class="btn sm" data-act="new-exp">+ مصروف</button></div>
-   ${ex.length?ex.map(e=>`<div class="item"><div class="t"><b>${esc(e.type)}</b><div>${dshow(e.date)}${e.note?' · '+esc(e.note):''}</div></div><span>${money(e.amount)}</span>${isAdmin?`<button class="btn sm danger" data-act="del-exp" data-id="${esc(e.id)}">حذف</button>`:''}</div>`).join(''):'<div class="hint">مفيش مصاريف متسجلة. سجل المرتبات والإيجار والكهرباء والمستهلكات هنا.</div>'}</div>`;
+   ${ex.length?ex.map(e=>`<div class="item"><div class="t"><b>${esc(e.type)}</b><div>${dshow(e.date)}${e.note?' · '+esc(e.note):''}</div>${e.by?`<div class="by">${esc(e.by)}</div>`:''}</div><span>${money(e.amount)}</span><button class="btn sm danger" data-act="del-exp" data-id="${esc(e.id)}">حذف</button></div>`).join(''):'<div class="hint">مفيش مصاريف متسجلة. سجل المرتبات والإيجار والكهرباء والمستهلكات هنا.</div>'}</div>`;
 }
 function incomeList(){return slist('incomes','items')}
 function incomeTotal(){return incomeList().reduce((s,x)=>s+num(x.amount),0)}
 function incomesHtml(){
   const items=[...incomeList()].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40);
   return `<div class="box"><div class="head"><h2 style="margin:0">دخل إضافي</h2><button class="btn sm" data-act="new-income">+ دخل</button></div>
-   ${items.length?items.map(x=>`<div class="item"><div class="t"><b>${esc(x.source||'دخل')}</b><div>${dshow(x.date)}${x.note?' · '+esc(x.note):''}</div></div><span class="good">${money(x.amount)}</span>${isAdmin?`<button class="btn sm danger" data-act="del-income" data-id="${esc(x.id)}">حذف</button>`:''}</div>`).join(''):'<div class="hint">أي فلوس داخلة مش من أجهزة العملاء (بيع إكسسوار، رجوع فلوس...) سجلها هنا.</div>'}</div>`;
+   ${items.length?items.map(x=>`<div class="item"><div class="t"><b>${esc(x.source||'دخل')}</b><div>${dshow(x.date)}${x.note?' · '+esc(x.note):''}</div>${x.by?`<div class="by">${esc(x.by)}</div>`:''}</div><span class="good">${money(x.amount)}</span><button class="btn sm danger" data-act="del-income" data-id="${esc(x.id)}">حذف</button></div>`).join(''):'<div class="hint">أي فلوس داخلة مش من أجهزة العملاء (بيع إكسسوار، رجوع فلوس...) سجلها هنا.</div>'}</div>`;
 }
 function openIncome(){
   S.modal={type:'income'};
   showModal(sheetHtml('دخل جديد',`<form class="form" id="incform"><div class="g2">${field('المصدر','<input id="in-src" required placeholder="بيع إكسسوار / رجوع فلوس">')}${field('المبلغ (ج)','<input id="in-amt" type="number" inputmode="decimal" step="any" min="0" required>')}</div><div class="g2">${field('التاريخ',`<input id="in-date" type="date" value="${today()}">`)}${field('ملاحظة','<input id="in-note">')}</div><button class="btn" type="submit">حفظ الدخل</button></form>`));
   $('#incform').addEventListener('submit',async e=>{e.preventDefault();
     const amt=num($('#in-amt').value), src=$('#in-src').value.trim(); if(amt<=0||!src){toast('اكتب المصدر والمبلغ');return}
-    const items=[...incomeList(),{id:uid(),source:src,amount:amt,date:$('#in-date').value||today(),note:$('#in-note').value.trim()}];
+    const items=[...incomeList(),{id:uid(),source:src,amount:amt,date:$('#in-date').value||today(),note:$('#in-note').value.trim(),by:byWho()}];
     if(await ssave('incomes',{items})){closeModal();toast('اتسجل')}});
 }
 function renderStaffMoney(){
   const g=(id,x)=>{const el=$('#'+id); if(el)el.innerHTML=x};
-  g('incomes',incomesHtml()); renderExps(); g('debts',debtsHtml()); g('tools',toolsHtml());
+  g('flow',flowHtml()); g('incomes',incomesHtml()); renderExps(); g('losses',lossesHtml()); g('debts',debtsHtml()); g('tools',toolsHtml());
 }
 function openExpense(){
   S.modal={type:'exp'};
@@ -964,7 +1036,7 @@ function openExpense(){
     <button class="btn" type="submit">حفظ المصروف</button></form></div>`);
   $('#expform').addEventListener('submit',async e=>{e.preventDefault();
     const amt=num($('#e-amt').value); if(amt<=0){toast('اكتب المبلغ');return}
-    if(await safe(()=>put('expenses',newId('expenses'),{type:$('#e-type').value.trim()||'أخرى',amount:amt,date:$('#e-date').value||today(),note:$('#e-note').value.trim()}))){closeModal();toast('اتسجل')}});
+    if(await safe(()=>put('expenses',newId('expenses'),{type:$('#e-type').value.trim()||'أخرى',amount:amt,date:$('#e-date').value||today(),note:$('#e-note').value.trim(),by:byWho()}))){closeModal();toast('اتسجل')}});
 }
 function openLoss(){
   S.modal={type:'loss'};
@@ -977,7 +1049,7 @@ function openLoss(){
     <button class="btn" type="submit">حفظ الخسارة</button></form></div>`);
   $('#lossform').addEventListener('submit',async e=>{e.preventDefault();
     const amt=num($('#l-amt').value); if(amt<=0){toast('اكتب المبلغ');return}
-    if(await safe(()=>put('losses',newId('losses'),{amount:amt,date:$('#l-date').value||today(),reason:$('#l-reason').value.trim(),deviceId:$('#l-dev').value}))){closeModal();toast('اتسجلت')}});
+    if(await safe(()=>put('losses',newId('losses'),{amount:amt,date:$('#l-date').value||today(),reason:$('#l-reason').value.trim(),deviceId:$('#l-dev').value,by:byWho()}))){closeModal();toast('اتسجلت')}});
 }
 
 /* ----- settings ----- */
@@ -995,7 +1067,7 @@ function renderSettings(){
     ${field('رصيد بداية المكان (ج)',`<input id="s-open" type="number" inputmode="decimal" step="any" value="${fs.opening??''}">`)}
     <div class="hint">أسماء التيم بتظهر كاقتراحات في المستلم والفني وصاحب المحفظة. التيم يقدر يفتح الأجهزة والمخزون، والحسابات والإعدادات ليك بس.</div>
     <button class="btn" type="submit">حفظ الإعدادات</button></form></div>
-  <div class="box"><h2>نسخة احتياطية</h2><div class="hint" style="margin-bottom:10px">نزّل نسخة من البيانات على جهازك وخليها في مكان آمن (مرة كل شهر على الأقل). الملف الكامل للاحتياط، وملف الأجهزة بيفتح في إكسيل.</div><div class="acts"><button class="btn soft" data-act="backup-json">نسخة كاملة (JSON)</button><button class="btn soft" data-act="backup-csv">الأجهزة (Excel)</button></div></div>`+usersHtml();
+  ${appearanceHtml()}<div class="box"><h2>نسخة احتياطية</h2><div class="hint" style="margin-bottom:10px">نزّل نسخة من البيانات على جهازك وخليها في مكان آمن (مرة كل شهر على الأقل). الملف الكامل للاحتياط، وملف الأجهزة بيفتح في إكسيل.</div><div class="acts"><button class="btn soft" data-act="backup-json">نسخة كاملة (JSON)</button><button class="btn soft" data-act="backup-csv">الأجهزة (Excel)</button></div></div>`+usersHtml()+auditHtml();
   $('#setform').addEventListener('submit',async e=>{e.preventDefault();
     const days=Math.max(1,Math.round(num($('#s-days').value))||7);
     const team=$('#s-team').value.split('\n').map(x=>x.trim()).filter(Boolean);
@@ -1145,7 +1217,7 @@ document.addEventListener('click',async e=>{
   if(act==='new-ret')return openRet();
   if(act==='del-ret'){armConfirm(b,()=>ssave('returns',{items:slist('returns','items').filter(x=>x.id!==id)}));return}
   if(act==='del-quote'){armConfirm(b,()=>ssave('quotes',{items:slist('quotes','items').filter(x=>x.id!==id)}));return}
-  if(act==='del-income'){armConfirm(b,()=>ssave('incomes',{items:incomeList().filter(x=>x.id!==id)}));return}
+  if(act==='del-income'){armConfirm(b,async()=>{const x=incomeList().find(z=>z.id===id)||{}; if(await ssave('incomes',{items:incomeList().filter(z=>z.id!==id)}))audit('حذف دخل',(x.source||'')+' · '+fmt(x.amount)+' ج'+(x.by?' (سجّله '+x.by+')':''))});return}
   if(act==='new-loss')return openLoss();
   if(act==='print-receipt'){window.print();return}
   if(act==='share-receipt')return shareReceipt();
@@ -1154,12 +1226,12 @@ document.addEventListener('click',async e=>{
   if(act==='receipt'&&d)return openReceipt(d.id);
   if(act==='set-status'&&d){
     const k=b.dataset.k; if(k===d.status)return;
-    const data={status:k,statusAt:Date.now(),deliveredAt:k==='done'?today():''};
+    const data={status:k,statusAt:Date.now(),deliveredAt:k==='done'?today():'',statusBy:byWho()};
     await devPatch(d.id,data); return;
   }
   if(act==='add-part'&&d){
     const name=$('#p-name').value.trim(); if(!name){toast('اكتب اسم القطعة');return}
-    const part={id:'p'+Date.now().toString(36),name,supplier:$('#p-sup').value.trim(),price:num($('#p-price').value),shipping:num($('#p-ship').value),date:today(),sw:num($('#p-sw').value)};
+    const part={id:'p'+Date.now().toString(36),name,supplier:$('#p-sup').value.trim(),price:num($('#p-price').value),shipping:num($('#p-ship').value),date:today(),sw:num($('#p-sw').value),by:byWho()};
     const warn=cheaperFor(part.name,part.price+part.shipping,part.supplier);
     const bk=['p-name','p-sup','p-price','p-ship','p-sw'].map(k=>[k,$('#'+k).value]);
     bk.forEach(([k])=>{$('#'+k).value=''});   /* clear first so a live refresh can't bring the old text back */
@@ -1171,21 +1243,21 @@ document.addEventListener('click',async e=>{
   if(act==='add-stock-part'&&d){
     const it=cache.inventory.find(x=>x.id===$('#p-stock').value);
     if(!it||num(it.qty)<1){toast('القطعة دي خلصت من المخزون');return}
-    const part={id:'p'+Date.now().toString(36),name:it.name+(it.model?' - '+it.model:''),supplier:it.supplier||'',price:num(it.buyPrice),shipping:0,stockId:it.id,fromStock:true,date:today()};
+    const part={id:'p'+Date.now().toString(36),name:it.name+(it.model?' - '+it.model:''),supplier:it.supplier||'',price:num(it.buyPrice),shipping:0,stockId:it.id,fromStock:true,date:today(),by:byWho()};
     if(await devPatch(d.id,{parts:[...(d.parts||[]),part]})) await safe(()=>patch('inventory',it.id,{qty:num(it.qty)-1}));
     return;
   }
   if(act==='del-part'&&d){
     armConfirm(b,async()=>{
       const p=(d.parts||[]).find(x=>x.id===b.dataset.pid);
-      if(await devPatch(d.id,{parts:(d.parts||[]).filter(x=>x.id!==b.dataset.pid)})&&p&&p.stockId){
+      const okp=await devPatch(d.id,{parts:(d.parts||[]).filter(x=>x.id!==b.dataset.pid)}); if(okp&&p)audit('حذف قطعة',(p.name||'')+' · '+fmt(num(p.price)+num(p.shipping))+' ج من جهاز '+(d.customer||'')); if(okp&&p&&p.stockId){
         const it=cache.inventory.find(x=>x.id===p.stockId); if(it)await safe(()=>patch('inventory',it.id,{qty:num(it.qty)+1}));
       }
     });return;
   }
   if(act==='add-pay'&&d){
     const amt=num($('#y-amt').value); if(amt<=0){toast('اكتب المبلغ');return}
-    const pay={id:'y'+Date.now().toString(36),amount:amt,method:$('#y-method').value,receivedBy:$('#y-by').value.trim(),holder:$('#y-holder').value.trim()||DRAWER,date:today()};
+    const pay={id:'y'+Date.now().toString(36),amount:amt,method:$('#y-method').value,receivedBy:$('#y-by').value.trim(),holder:$('#y-holder').value.trim()||DRAWER,date:today(),by:byWho()};
     const fullyPaid=num(d.price)>0&&paidOf(d)+amt>=num(d.price);
     const autoDeliver=fullyPaid&&(d.status==='ready'||d.status==='hold');
     const data={payments:[...(d.payments||[]),pay]};
@@ -1199,23 +1271,23 @@ document.addEventListener('click',async e=>{
   if(act==='deliver'){
     const dv=devs().find(x=>x.id===(id||(d&&d.id))); if(!dv||dv.status==='done')return;
     const left=num(dv.price)-paidOf(dv);
-    const run=async()=>{ if(await devPatch(dv.id,{status:'done',statusAt:Date.now(),deliveredAt:today()}))toast('تم التسليم ✓'); };
+    const run=async()=>{ if(await devPatch(dv.id,{status:'done',statusAt:Date.now(),deliveredAt:today(),statusBy:byWho()}))toast('تم التسليم ✓'); };
     const msgs=[]; if(left>0)msgs.push('لسه على العميل '+fmt(left)+' ج'); if(!(dv.qc&&dv.qc.ok))msgs.push('الجهاز لسه ماعدّاش فحص الجودة');
     if(msgs.length){ armConfirm(b,run); toast(msgs.join(' و ')+'. اضغط تاني لو هتسلمه'); return; }
     return run();
   }
-  if(act==='del-pay'&&d){armConfirm(b,()=>devPatch(d.id,{payments:(d.payments||[]).filter(x=>x.id!==b.dataset.pid)}));return}
-  if(act==='del-dev'&&d){armConfirm(b,async()=>{if(await safe(()=>remove('devices',d.id))){closeModal();toast('اتحذف الجهاز')}});return}
+  if(act==='del-pay'&&d){armConfirm(b,async()=>{const p=(d.payments||[]).find(x=>x.id===b.dataset.pid)||{}; if(await devPatch(d.id,{payments:(d.payments||[]).filter(x=>x.id!==b.dataset.pid)}))audit('حذف دفعة',fmt(p.amount)+' ج من جهاز '+(d.customer||''))});return}
+  if(act==='del-dev'&&d){armConfirm(b,async()=>{if(await safe(()=>remove('devices',d.id))){audit('حذف جهاز','#'+String(d.no||0).padStart(4,'0')+' '+(d.customer||'')+' · '+(d.model||'')+(d.addedBy?' (سجّله '+d.addedBy+')':''));closeModal();toast('اتحذف الجهاز')}});return}
   if(act==='qty-minus'||act==='qty-plus'){
     const it=cache.inventory.find(x=>x.id===id); if(!it)return;
     const q=Math.max(0,num(it.qty)+(act==='qty-plus'?1:-1)); if(q===num(it.qty))return;
     await safe(()=>patch('inventory',id,{qty:q})); return;
   }
   if(act==='del-item'){
-    const itId=S.modal&&S.modal.id; armConfirm(b,async()=>{if(await safe(()=>remove('inventory',itId))){closeModal();toast('اتحذفت')}});return;
+    const itId=S.modal&&S.modal.id; armConfirm(b,async()=>{const it0=cache.inventory.find(z=>z.id===itId)||{}; if(await safe(()=>remove('inventory',itId))){audit('حذف قطعة من المخزون',(it0.name||'')+' · كمية '+num(it0.qty));closeModal();toast('اتحذفت')}});return;
   }
-  if(act==='del-exp'){armConfirm(b,()=>safe(()=>remove('expenses',id)));return}
-  if(act==='del-loss'){armConfirm(b,()=>safe(()=>remove('losses',id)));return}
+  if(act==='del-exp'){armConfirm(b,async()=>{const x=cache.expenses.find(z=>z.id===id)||{}; if(await safe(()=>remove('expenses',id)))audit('حذف مصروف',(x.type||'')+' · '+fmt(x.amount)+' ج'+(x.by?' (سجّله '+x.by+')':''))});return}
+  if(act==='del-loss'){armConfirm(b,async()=>{const x=cache.losses.find(z=>z.id===id)||{}; if(await safe(()=>remove('losses',id)))audit('حذف خسارة',(x.reason||'')+' · '+fmt(x.amount)+' ج'+(x.by?' (سجّلها '+x.by+')':''))});return}
   if(act==='handover'){
     const from=b.dataset.h,to=b.dataset.to;
     for(const dv of devs()){
@@ -1279,32 +1351,24 @@ const monthLabel=ref=>{const d=parse(ref);return `${MONTHS[d.getMonth()]} ${d.ge
 /* ---------- dashboard (top of the devices tab) ---------- */
 function renderDash(){
   const el=$('#dash'); if(!el)return;
-  const ds=devs(), t=today();
-  const ready=ds.filter(d=>d.status==='ready'||d.status==='hold').length;
-  const stale=ds.filter(isStale).length;
-  const doneToday=ds.filter(d=>d.status==='done'&&d.deliveredAt===t);
+  const ds=devs(), t=today(), n=k=>groupDevs(k).length;
+  const doneToday=groupDevs('out');
   const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-partsLoggedIn({from:t,to:t});
   let sw=0; ds.forEach(d=>(d.parts||[]).forEach(p=>{const i=swInfo(p); if(i&&i.left>=0&&i.left<=7)sw++}));
   const low=cache.inventory.filter(i=>num(i.min)>0&&num(i.qty)<=num(i.min)).length;
-  const st=(n,l,cls)=>`<div class="stat"><b class="${cls||''}">${n}</b><span>${l}</span></div>`;
-  let h=`<div class="dash">${st(ready,'جاهز للتسليم')}${st(stale,'متأخر',stale?'crit':'')}${st(doneToday.length,'اتسلم النهاردة')}${isAdmin?st(fmt(profit),'ربح النهاردة بعد قطع الغيار (قبل المصاريف)',profit>=0?'good':'crit'):''}${sw?st(sw,'ضمان تاجر قرب ينتهي','crit'):''}${low?st(low,'قطع مخزون قليل','crit'):''}</div>`;
-  const cnt=k=>ds.filter(d=>d.status===k).length;
-  const enteredToday=ds.filter(d=>(d.createdAt?iso(new Date(d.createdAt)):d.entryDate)===t).length;
   const hr=new Date().getHours(), greet=hr<12?'صباح الخير':hr<18?'نهارك سعيد':'مساء الخير';
-  const needPart=cnt('part'), waiting=cnt('wait'), checking=cnt('check'), hold=cnt('hold'), rdy=cnt('ready');
-  const open=ds.filter(d=>d.status!=='done').length;
+  const tile=(k,l,warn)=>`<button type="button" class="tile ${warn?'warn':''}" data-act="grp" data-k="${k}"><b>${n(k)}</b><span>${l}</span></button>`;
   const row=(l,v,c)=>`<div class="row"><span>${l}</span><span class="${c||''}">${v}</span></div>`;
   let adm='';
   if(isAdmin){
     const collectedT=ds.reduce((s,d)=>s+(d.payments||[]).filter(p=>p.date===t).reduce((a,p)=>a+num(p.amount),0),0);
     const expT=cache.expenses.filter(e=>e.date===t).reduce((s,e)=>s+num(e.amount),0);
-    adm=row('اتقبض النهاردة',money(collectedT))+row('مصاريف النهاردة',expT?'− '+money(expT):money(0),expT?'crit':'')+row('ربح النهاردة (بعد القطع، قبل المصاريف)',money(profit),profit>=0?'good':'crit');
+    adm=`<div class="rows" style="margin-top:6px">${row('اتقبض النهاردة',money(collectedT))}${row('مصاريف النهاردة',expT?'− '+money(expT):money(0),expT?'crit':'')}${row('ربح النهاردة (بعد القطع، قبل المصاريف)',money(profit),profit>=0?'good':'crit')}</div>`;
   }
-  h=`<div class="box"><h2 style="margin-bottom:8px">${greet}، ملخص النهاردة</h2><div class="rows">
-    ${row('أجهزة دخلت النهاردة',enteredToday)}${row('اتسلم النهاردة',doneToday.length,doneToday.length?'good':'')}${row('لسه شغالين عليها',open)}
-    ${row('في الانتظار',waiting)}${row('جاري الفحص',checking)}${row('مستنية قطعة غيار',needPart,needPart?'crit':'')}${row('جاهزة للتسليم',rdy+hold)}${stale?row('متأخرة من غير تحديث',stale,'crit'):''}
-    ${adm}</div></div>`+h;
-  el.innerHTML=h;
+  const warns=(sw||low)?`<div class="banner" style="margin-top:10px">${sw?`<b>${sw}</b> قطعة ضمان تاجرها قرب ينتهي. `:''}${low?`<b>${low}</b> قطعة مخزون قليلة.`:''}</div>`:'';
+  el.innerHTML=`<div class="box"><h2 style="margin-bottom:8px">${greet}، ملخص النهاردة</h2>
+    <div class="tiles">${tile('in','دخلت النهاردة')}${tile('out','اتسلم النهاردة')}${tile('open','لسه شغالين')}${tile('wait','في الانتظار')}${tile('check','جاري الفحص')}${tile('part','مستنية قطعة',n('part')>0)}${tile('ready','جاهزة للتسليم')}${n('stale')?tile('stale','متأخرة',true):''}</div>
+    ${adm}${warns}<div class="hint" style="margin-top:8px">دوس على أي مربع تشوف أجهزته، وتنقلها للمرحلة اللي بعدها أو تضيف قطعة غيار من جواه.</div></div>`;
 }
 
 /* ---------- extra sections inside the device sheet ---------- */
@@ -1366,7 +1430,7 @@ function openQuote(){
     const sup=$('#q-sup').value.trim(), name=$('#q-name').value.trim(), price=num($('#q-price').value);
     if(!sup||!name||price<=0){toast('اكتب التاجر والقطعة والسعر');return}
     const warn=cheaperFor(name,price,sup);
-    const items=[...slist('quotes','items'),{id:uid(),sup,name,price,date:$('#q-date').value||today(),note:$('#q-note').value.trim()}];
+    const items=[...slist('quotes','items'),{id:uid(),sup,name,price,date:$('#q-date').value||today(),note:$('#q-note').value.trim(),by:byWho()}];
     if(await ssave('quotes',{items})){closeModal();toast(warn||'اتسجل',warn?8000:0)}});
 }
 
@@ -1387,7 +1451,7 @@ function openRet(){
   showModal(sheetHtml('قطعة معيوبة',`<form class="form" id="rform">${field('التاجر','<input id="r-sup" list="dl-suppliers" required autocomplete="off">')}<div class="g2">${field('القطعة','<input id="r-name" required placeholder="شاشة A52">')}${field('التاريخ',`<input id="r-date" type="date" value="${today()}">`)}</div>${field('العيب / ملاحظة','<input id="r-note" placeholder="لمس بايظ / ماتشغلتش">')}<button class="btn" type="submit">حفظ</button></form>`));
   $('#rform').addEventListener('submit',async e=>{e.preventDefault();
     const sup=$('#r-sup').value.trim(), name=$('#r-name').value.trim(); if(!sup||!name){toast('اكتب التاجر والقطعة');return}
-    const items=[...slist('returns','items'),{id:uid(),sup,name,date:$('#r-date').value||today(),note:$('#r-note').value.trim()}];
+    const items=[...slist('returns','items'),{id:uid(),sup,name,date:$('#r-date').value||today(),note:$('#r-note').value.trim(),by:byWho()}];
     if(await ssave('returns',{items})){closeModal();toast('اتسجلت')}});
 }
 
@@ -1465,7 +1529,7 @@ function debtsHtml(){
   const items=slist('debts','items');
   const open=items.filter(x=>!x.paid), forMe=open.filter(x=>x.dir==='for').reduce((s,x)=>s+num(x.amount),0), onMe=open.filter(x=>x.dir==='on').reduce((s,x)=>s+num(x.amount),0);
   const bal=cashBalance();
-  const list=[...items].sort((a,b)=>(!!a.paid-!!b.paid)||String(b.date).localeCompare(String(a.date))).map(x=>`<div class="item"><div class="t"><b>${esc(x.who||'—')}</b> <span class="qual">${x.dir==='for'?'لينا':'علينا'}</span>${x.paid?' <span class="qual">اتسدد</span>':''}<div>${dshow(x.date)}${x.note?' · '+esc(x.note):''}</div></div><span class="${x.dir==='for'?'good':'crit'}">${money(x.amount)}</span><button class="btn sm soft" data-act="debt-toggle" data-id="${esc(x.id)}">${x.paid?'رجّع':'تم السداد'}</button><button class="btn sm danger" data-act="debt-del" data-id="${esc(x.id)}">حذف</button></div>`).join('');
+  const list=[...items].sort((a,b)=>(!!a.paid-!!b.paid)||String(b.date).localeCompare(String(a.date))).map(x=>`<div class="item"><div class="t"><b>${esc(x.who||'—')}</b> <span class="qual">${x.dir==='for'?'لينا':'علينا'}</span>${x.paid?' <span class="qual">اتسدد</span>':''}<div>${dshow(x.date)}${x.note?' · '+esc(x.note):''}</div>${x.by?`<div class="by">${esc(x.by)}</div>`:''}</div><span class="${x.dir==='for'?'good':'crit'}">${money(x.amount)}</span><button class="btn sm soft" data-act="debt-toggle" data-id="${esc(x.id)}">${x.paid?'رجّع':'تم السداد'}</button><button class="btn sm danger" data-act="debt-del" data-id="${esc(x.id)}">حذف</button></div>`).join('');
   return secBox('debts','الديون (لينا وعلينا)',`<div class="acts"><button class="btn sm" data-act="debt-new">+ دين</button></div>
    <div class="rows"><div class="row"><span>فلوس لينا عند ناس</span><span class="good">${money(forMe)}</span></div><div class="row"><span>فلوس علينا لناس</span><span class="crit">${money(onMe)}</span></div>${isAdmin?`<div class="row"><span>رصيد المكان الحالي</span><span>${money(bal)}</span></div><div class="row total"><span>الوضع المالي الكلي</span><span class="${bal+forMe-onMe>=0?'good':'crit'}">${money(bal+forMe-onMe)}</span></div>`:''}</div>
    ${list?`<h3 style="margin-top:12px">القايمة</h3>${list}`:'<div class="hint" style="margin-top:8px">مفيش ديون متسجلة.</div>'}`);
@@ -1475,7 +1539,7 @@ function openDebt(){
   showModal(sheetHtml('دين جديد',`<form class="form" id="debtform"><div class="g2">${field('اسم الشخص / الجهة','<input id="db-who" required>')}${field('المبلغ (ج)','<input id="db-amt" type="number" inputmode="decimal" step="any" min="0" required>')}</div><div class="g2">${field('النوع','<select id="db-dir"><option value="for">لينا (حد واخد مننا)</option><option value="on">علينا (واخدين من حد)</option></select>')}${field('التاريخ',`<input id="db-date" type="date" value="${today()}">`)}</div>${field('ملاحظة','<input id="db-note">')}<button class="btn" type="submit">حفظ</button></form>`));
   $('#debtform').addEventListener('submit',async e=>{
     e.preventDefault(); const amt=num($('#db-amt').value), who=$('#db-who').value.trim(); if(!who||amt<=0){toast('اكتب الاسم والمبلغ');return}
-    const items=[...slist('debts','items'),{id:uid(),who,amount:amt,dir:$('#db-dir').value,date:$('#db-date').value||today(),note:$('#db-note').value.trim(),paid:false}];
+    const items=[...slist('debts','items'),{id:uid(),who,amount:amt,dir:$('#db-dir').value,date:$('#db-date').value||today(),note:$('#db-note').value.trim(),paid:false,by:byWho()}];
     if(await ssave('debts',{items})){closeModal();toast('اتسجل')}
   });
 }
@@ -1485,16 +1549,16 @@ function toolsHtml(){
   const items=slist('tools','items'); const cap=items.reduce((s,t)=>s+num(t.qty)*num(t.price),0);
   const maint=items.reduce((s,t)=>s+(t.maint||[]).reduce((a,m)=>a+num(m.cost),0),0);
   return secBox('tools','العدد والأدوات',`<div class="acts"><button class="btn sm" data-act="tool-new">+ أداة</button></div>
-   ${items.length?`<div class="rows" style="margin-bottom:8px"><div class="row"><span>رأس المال في الأدوات</span><span>${money(cap)}</span></div><div class="row"><span>اتصرف على صيانتها</span><span>${money(maint)}</span></div></div>`+items.map(t=>`<div class="item"><button class="t" data-act="tool-open" data-id="${esc(t.id)}" style="background:none;border:0;text-align:start;padding:0;cursor:pointer"><b>${esc(t.name)}</b><div>${num(t.qty)} × ${money(t.price)}${(t.issues||[]).length?` · ${(t.issues||[]).length} عطل متسجل`:''}</div></button><span>${money(num(t.qty)*num(t.price))}</span></div>`).join(''):'<div class="hint">سجل أدواتك (ميكروسكوب، هوت اير، باور سابلاي...) بالكمية والسعر عشان تعرف رأس مالك فيها، وسجل أعطالها وصيانتها.</div>'}`);
+   ${items.length?`<div class="rows" style="margin-bottom:8px"><div class="row"><span>رأس المال في الأدوات</span><span>${money(cap)}</span></div><div class="row"><span>اتصرف على صيانتها</span><span>${money(maint)}</span></div></div>`+items.map(t=>`<div class="item"><button class="t" data-act="tool-open" data-id="${esc(t.id)}" style="background:none;border:0;text-align:start;padding:0;cursor:pointer"><b>${esc(t.name)}</b><div>${num(t.qty)} × ${money(t.price)}${(t.issues||[]).length?` · ${(t.issues||[]).length} عطل متسجل`:''}${t.by?' · '+esc(t.by):''}</div></button><span>${money(num(t.qty)*num(t.price))}</span></div>`).join(''):'<div class="hint">سجل أدواتك (ميكروسكوب، هوت اير، باور سابلاي...) بالكمية والسعر عشان تعرف رأس مالك فيها، وسجل أعطالها وصيانتها.</div>'}`);
 }
 function openTool(id){
   const items=slist('tools','items'); const t=id?items.find(x=>x.id===id):null; S.modal={type:'tool',id:id||null};
-  const logs=t?`<h3 style="margin-top:14px">سجل الأعطال</h3><div class="box">${(t.issues||[]).length?t.issues.map(x=>`<div class="item"><div class="t"><b>${dshow(x.date)}</b><div>${esc(x.text||'')}</div></div><button class="btn sm danger" data-act="tool-del-log" data-kind="issues" data-pid="${esc(x.id)}">حذف</button></div>`).join(''):'<div class="hint" style="margin-bottom:8px">مفيش أعطال متسجلة.</div>'}<div class="form" style="margin-top:8px">${field('وصف العطل','<input id="ti-text" placeholder="مثال: الحرارة مش ثابتة">')}<button class="btn soft" type="button" data-act="tool-issue-add">تسجيل عطل</button></div></div>
-   <h3>سجل الصيانة (القطع اللي اتغيرت)</h3><div class="box">${(t.maint||[]).length?t.maint.map(x=>`<div class="item"><div class="t"><b>${esc(x.part||'—')}</b><div>${dshow(x.date)}</div></div><span>${money(x.cost)}</span><button class="btn sm danger" data-act="tool-del-log" data-kind="maint" data-pid="${esc(x.id)}">حذف</button></div>`).join(''):'<div class="hint" style="margin-bottom:8px">مفيش صيانة متسجلة.</div>'}<div class="form" style="margin-top:8px"><div class="g2">${field('القطعة اللي اتغيرت','<input id="tm-part" placeholder="مثال: سخان الهوت اير">')}${field('التكلفة (ج)','<input id="tm-cost" type="number" inputmode="decimal" step="any" min="0">')}</div><button class="btn soft" type="button" data-act="tool-maint-add">تسجيل صيانة</button></div></div>`:'';
+  const logs=t?`<h3 style="margin-top:14px">سجل الأعطال</h3><div class="box">${(t.issues||[]).length?t.issues.map(x=>`<div class="item"><div class="t"><b>${dshow(x.date)}</b><div>${esc(x.text||'')}${x.by?' · '+esc(x.by):''}</div></div><button class="btn sm danger" data-act="tool-del-log" data-kind="issues" data-pid="${esc(x.id)}">حذف</button></div>`).join(''):'<div class="hint" style="margin-bottom:8px">مفيش أعطال متسجلة.</div>'}<div class="form" style="margin-top:8px">${field('وصف العطل','<input id="ti-text" placeholder="مثال: الحرارة مش ثابتة">')}<button class="btn soft" type="button" data-act="tool-issue-add">تسجيل عطل</button></div></div>
+   <h3>سجل الصيانة (القطع اللي اتغيرت)</h3><div class="box">${(t.maint||[]).length?t.maint.map(x=>`<div class="item"><div class="t"><b>${esc(x.part||'—')}</b><div>${dshow(x.date)}${x.by?' · '+esc(x.by):''}</div></div><span>${money(x.cost)}</span><button class="btn sm danger" data-act="tool-del-log" data-kind="maint" data-pid="${esc(x.id)}">حذف</button></div>`).join(''):'<div class="hint" style="margin-bottom:8px">مفيش صيانة متسجلة.</div>'}<div class="form" style="margin-top:8px"><div class="g2">${field('القطعة اللي اتغيرت','<input id="tm-part" placeholder="مثال: سخان الهوت اير">')}${field('التكلفة (ج)','<input id="tm-cost" type="number" inputmode="decimal" step="any" min="0">')}</div><button class="btn soft" type="button" data-act="tool-maint-add">تسجيل صيانة</button></div></div>`:'';
   showModal(sheetHtml(t?'أداة':'أداة جديدة',`<form class="form" id="toolform">${field('الاسم',`<input id="tl-name" value="${esc(t&&t.name)}" required>`)}<div class="g2">${field('الكمية',`<input id="tl-qty" type="number" inputmode="numeric" min="0" value="${t?num(t.qty):1}">`)}${field('سعر الواحدة (ج)',`<input id="tl-price" type="number" inputmode="decimal" step="any" min="0" value="${t?num(t.price):''}">`)}</div><button class="btn" type="submit">حفظ</button>${t?'<button class="btn danger" type="button" data-act="tool-del">حذف الأداة</button>':''}</form>${logs}`));
   $('#toolform').addEventListener('submit',async e=>{
     e.preventDefault(); const name=$('#tl-name').value.trim(); if(!name){toast('اكتب الاسم');return}
-    const rec={...(t||{}),id:t?t.id:uid(),name,qty:num($('#tl-qty').value),price:num($('#tl-price').value),issues:(t&&t.issues)||[],maint:(t&&t.maint)||[]};
+    const rec={...(t||{}),id:t?t.id:uid(),name,qty:num($('#tl-qty').value),price:num($('#tl-price').value),by:(t&&t.by)||byWho(),issues:(t&&t.issues)||[],maint:(t&&t.maint)||[]};
     const list=t?items.map(x=>x.id===t.id?rec:x):[...items,rec];
     if(await ssave('tools',{items:list})){closeModal();toast('اتحفظ')}
   });
@@ -1532,15 +1596,18 @@ function statsHtml(){
     const prev=done.filter(x=>x.id!==d.id&&sameCust(d,x)&&sameModel(x,d)&&x.deliveredAt<=created&&(parse(created)-parse(x.deliveredAt))/864e5<=30).sort((a,b)=>b.deliveredAt.localeCompare(a.deliveredAt))[0];
     if(prev&&prev.tech)rep[prev.tech]=(rep[prev.tech]||0)+1;
   });
-  const techs={}; done.forEach(d=>{const k=d.tech||'بدون فني'; const o=techs[k]||(techs[k]={n:0,profit:0,rs:0,rn:0}); o.n++; o.profit+=num(d.price)-partCost(d); if(d.rating){o.rs+=d.rating;o.rn++}});
-  const tl=Object.entries(techs).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<div class="item"><div class="t"><b>${esc(k)}</b><div>${o.n} جهاز اتسلم · رجوع بنفس العطل خلال 30 يوم: ${rep[k]||0}${o.rn?` · متوسط التقييم ${(o.rs/o.rn).toFixed(1)}★`:''}</div></div><span class="${o.profit>=0?'good':'crit'}">${money(o.profit)}</span></div>`).join('');
+  const techs={}; done.forEach(d=>{const k=d.tech||'بدون فني'; const o=techs[k]||(techs[k]={n:0,profit:0,rev:0,rs:0,rn:0}); o.n++; o.rev+=num(d.price); o.profit+=num(d.price)-partCost(d); if(d.rating){o.rs+=d.rating;o.rn++}});
+  const maxRev=Math.max(1,...Object.values(techs).map(o=>o.rev));
+  const tl=Object.entries(techs).sort((a,b)=>b[1].rev-a[1].rev).map(([k,o])=>`<div class="brow"><div class="top2"><b>${esc(k)}</b><span class="num">${fmt(o.rev)} ج</span></div><div class="bar alt"><i style="width:${Math.max(2,Math.round(o.rev/maxRev*100))}%"></i></div><div class="hint" style="margin-top:4px">${o.n} جهاز اتسلم · الربح ${fmt(o.profit)} ج · رجوع بنفس العطل خلال 30 يوم: ${rep[k]||0}${o.rn?` · تقييم ${(o.rs/o.rn).toFixed(1)}★`:''}</div></div>`).join('');
   const pc={}; ds.forEach(d=>(d.parts||[]).forEach(p=>{const k=String(p.name||'').trim().toLowerCase(); if(!k)return; const o=pc[k]||(pc[k]={name:p.name.trim(),n:0,cost:0}); o.n++; o.cost+=num(p.price)+num(p.shipping)}));
   const pl=Object.values(pc).sort((a,b)=>b.n-a.n).slice(0,8).map(o=>`<div class="item"><div class="t"><b>${esc(o.name)}</b></div><span class="num">${o.n} مرة</span></div>`).join('');
   const fc={}; done.forEach(d=>{const k=String(d.issue||'').trim(); if(!k)return; const o=fc[k]||(fc[k]={k,n:0,profit:0}); o.n++; o.profit+=num(d.price)-partCost(d)});
-  const fl=Object.values(fc).sort((a,b)=>b.profit-a.profit).slice(0,8).map(o=>`<div class="item"><div class="t"><b>${esc(o.k)}</b><div>${o.n} مرة · متوسط ${money(o.profit/o.n)}</div></div><span class="${o.profit>=0?'good':'crit'}">${money(o.profit)}</span></div>`).join('');
+  const fl=Object.values(fc).sort((a,b)=>b.profit-a.profit).slice(0,8).map(o=>`<div class="item"><button class="t" data-act="fault-open" data-k="${esc(String(o.k).toLowerCase())}" style="background:none;border:0;text-align:start;padding:0;cursor:pointer;color:inherit"><b>${esc(o.k)}</b><div>${o.n} مرة · متوسط ${money(o.profit/o.n)}</div><div class="hint">دوس تشوف أكتر الموديلات بالعطل ده</div></button><span class="${o.profit>=0?'good':'crit'}">${money(o.profit)}</span></div>`).join('');
   const mc={}; ds.forEach(d=>{const m=String(d.model||'').trim(), i=String(d.issue||'').trim(); if(!m||!i)return; const o=mc[m.toLowerCase()]||(mc[m.toLowerCase()]={m,n:0,f:{}}); o.n++; o.f[i]=(o.f[i]||0)+1});
   const ml=Object.values(mc).filter(o=>o.n>=2).sort((a,b)=>b.n-a.n).slice(0,8).map(o=>{const top=Object.entries(o.f).sort((a,b)=>b[1]-a[1])[0]; return `<div class="item"><div class="t"><b>${esc(o.m)}</b><div>الأكتر: ${esc(top[0])} (${top[1]} من ${o.n})</div></div></div>`}).join('');
-  const pt=Object.values(techPoints()).sort((a,b)=>b.month-a.month||b.total-a.total).map((o,i)=>`<div class="item"><div class="t"><b>${i===0&&o.month>0?'🏆 ':''}${esc(o.tech)}</b><div>الشهر ده ${o.month} · الإجمالي ${o.total} · في المعاد ${o.ontime} · تقييم عالي ${o.good} · رجوع ${o.back}</div></div><span class="num good">${o.month}</span></div>`).join('');
+  const ptArr=Object.values(techPoints()).sort((a,b)=>b.month-a.month||b.total-a.total);
+  const maxPt=Math.max(1,...ptArr.map(o=>Math.max(o.month,0)));
+  const pt=ptArr.map((o,i)=>`<div class="brow"><div class="top2"><b>${o.month>0&&i<3?['🏆 ','🥈 ','🥉 '][i]:''}${esc(o.tech)}</b><span class="num good">${o.month}</span></div><div class="bar"><i style="width:${Math.max(0,Math.round(o.month/maxPt*100))}%"></i></div><div class="hint" style="margin-top:4px">الشهر ده ${o.month} · الإجمالي ${o.total} · في المعاد ${o.ontime} · تقييم عالي ${o.good} · رجوع ${o.back}</div></div>`).join('');
   const blk=(t,h,e)=>`<h3 style="margin-top:12px">${t}</h3>${h||`<div class="hint">${e}</div>`}`;
   return secBox('stats','الإحصائيات',`${blk('نقاط الفنيين',pt,'لسه مفيش أجهزة اتسلمت.')}<div class="hint">${PTS_RULE}</div>${blk('أداء كل فني',tl,'لسه مفيش أجهزة اتسلمت.')}${blk('أكتر القطع استهلاكًا',pl,'لسه مفيش قطع متسجلة على أجهزة.')}${blk('الأعطال الأعلى ربحًا',fl,'لسه مفيش أجهزة اتسلمت بعطل مكتوب.')}${blk('العطل الأكتر لكل موديل',ml,'محتاج على الأقل جهازين من نفس الموديل.')}<div class="hint" style="margin-top:10px">الأعطال بتتجمع بنفس النص المكتوب، فاكتب العطل بنفس الصيغة كل مرة (مثال: "شاشة" مش مرة "شاشة" ومرة "تغيير شاشة").</div>`);
 }
@@ -1610,13 +1677,13 @@ document.addEventListener('click',async e=>{
   if(act==='pay-del-move'){armConfirm(b,()=>ssave('payroll',{members:slist('payroll','members'),moves:slist('payroll','moves').filter(x=>x.id!==id)}));return}
   if(act==='debt-new')return openDebt();
   if(act==='debt-toggle'){await ssave('debts',{items:slist('debts','items').map(x=>x.id===id?{...x,paid:!x.paid}:x)});return}
-  if(act==='debt-del'){armConfirm(b,()=>ssave('debts',{items:slist('debts','items').filter(x=>x.id!==id)}));return}
+  if(act==='debt-del'){armConfirm(b,async()=>{const x=slist('debts','items').find(z=>z.id===id)||{}; if(await ssave('debts',{items:slist('debts','items').filter(z=>z.id!==id)}))audit('حذف دين',(x.who||'')+' · '+fmt(x.amount)+' ج')});return}
   if(act==='tool-new')return openTool(null);
   if(act==='tool-open')return openTool(id);
   const tid=S.modal&&S.modal.type==='tool'?S.modal.id:null;
-  if(act==='tool-del'&&tid){armConfirm(b,async()=>{if(await ssave('tools',{items:slist('tools','items').filter(x=>x.id!==tid)})){closeModal();toast('اتحذفت')}});return}
-  if(act==='tool-issue-add'&&tid){const text=$('#ti-text').value.trim(); if(!text){toast('اكتب وصف العطل');return} await toolPatch(tid,t=>({...t,issues:[...(t.issues||[]),{id:uid(),date:today(),text}]})); return}
-  if(act==='tool-maint-add'&&tid){const part=$('#tm-part').value.trim(); if(!part){toast('اكتب القطعة');return} const cost=num($('#tm-cost').value); await toolPatch(tid,t=>({...t,maint:[...(t.maint||[]),{id:uid(),date:today(),part,cost}]})); return}
+  if(act==='tool-del'&&tid){armConfirm(b,async()=>{const t0=slist('tools','items').find(z=>z.id===tid)||{}; if(await ssave('tools',{items:slist('tools','items').filter(x=>x.id!==tid)})){audit('حذف أداة',t0.name||'');closeModal();toast('اتحذفت')}});return}
+  if(act==='tool-issue-add'&&tid){const text=$('#ti-text').value.trim(); if(!text){toast('اكتب وصف العطل');return} await toolPatch(tid,t=>({...t,issues:[...(t.issues||[]),{id:uid(),date:today(),text,by:byWho()}]})); return}
+  if(act==='tool-maint-add'&&tid){const part=$('#tm-part').value.trim(); if(!part){toast('اكتب القطعة');return} const cost=num($('#tm-cost').value); await toolPatch(tid,t=>({...t,maint:[...(t.maint||[]),{id:uid(),date:today(),part,cost,by:byWho()}]})); return}
   if(act==='tool-del-log'&&tid){const kind=b.dataset.kind, pid=b.dataset.pid; armConfirm(b,()=>toolPatch(tid,t=>({...t,[kind]:(t[kind]||[]).filter(x=>x.id!==pid)}))); return}
   if(act==='monthly-report')return openMonthReport();
   if(act==='backup-json'){
@@ -1630,9 +1697,9 @@ document.addEventListener('click',async e=>{
   }
   const d=curDev();
   if(!d)return;
-  if(act==='add-call'){const note=$('#c-note').value.trim(); await devPatch(d.id,{calls:[...(d.calls||[]),{id:uid(),date:today(),note}]}); return}
+  if(act==='add-call'){const note=$('#c-note').value.trim(); await devPatch(d.id,{calls:[...(d.calls||[]),{id:uid(),date:today(),note,by:byWho()}]}); return}
   if(act==='del-call'){armConfirm(b,()=>devPatch(d.id,{calls:(d.calls||[]).filter(x=>x.id!==b.dataset.pid)}));return}
-  if(act==='qc-ok'||act==='qc-bad'){await devPatch(d.id,{qc:{ok:act==='qc-ok',note:$('#q-note').value.trim(),date:today()}}); return}
+  if(act==='qc-ok'||act==='qc-bad'){await devPatch(d.id,{qc:{ok:act==='qc-ok',note:$('#q-note').value.trim(),date:today(),by:byWho()}}); return}
   if(act==='rate'){await devPatch(d.id,{rating:Number(b.dataset.k)||0}); return}
   if(act==='kb-from-dev'){S.kbq=d.issue||d.model||''; closeModal(); S.tab='kb'; renderTab(); return}
 });
@@ -1870,12 +1937,12 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='vq-in'){e.preventDefault(); vqApply(e.target.value)}});
 
 /* ================= self sign-up with admin approval · user management · fingerprint + location attendance ================= */
-['members','attendance','creds'].forEach(c=>{ if(!COLS.includes(c))COLS.push(c); if(!cache[c])cache[c]=[]; });
+['members','attendance','creds','audit'].forEach(c=>{ if(!COLS.includes(c))COLS.push(c); if(!cache[c])cache[c]=[]; });
 
 /* ----- sign-up screen ----- */
 function showSignup(msg){
   const L=$('#login'); L.hidden=false; $('#app').hidden=true; $('.nav').hidden=true;
-  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:4px">تسجيل جديد</div><div class="muted" style="margin-bottom:14px">اكتب بياناتك، والأدمن هيوافق على حسابك قبل ما تقدر تدخل.</div>
+  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:4px">${LOGO}تسجيل جديد</div><div class="muted" style="margin-bottom:14px">اكتب بياناتك، والأدمن هيوافق على حسابك قبل ما تقدر تدخل.</div>
    <form class="form" id="signform" autocomplete="on">
     ${field('الاسم','<input id="s-name" name="name" autocomplete="name" required>')}
     ${field('الإيميل','<input id="s-email" type="email" name="email" autocomplete="username" dir="ltr" inputmode="email" required>')}
@@ -1928,7 +1995,7 @@ function showGate(st){
     removed:['الحساب مش موجود','الحساب ده اتحذف أو لسه مش متسجل. سجّل خروج وجرّب تسجّل من جديد.'],
     neterr:['مفيش اتصال بالنت','مقدرتش أبعت طلب التسجيل للأدمن. اتأكد من النت ودوس "تحديث".'],
     error:['طلبك ماوصلش للأدمن','حصلت مشكلة وطلب التسجيل ماتسجلش، فالأدمن مش هيشوفه. بلّغ الأدمن بالرسالة دي: '+esc(String(memberStatus.lastErr||''))]}[st]||['مش مسموح','كلّم الأدمن.'];
-  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:8px">${t[0]}</div><div class="muted" style="margin-bottom:14px">${t[1]}</div>
+  L.innerHTML=`<div class="loginwrap"><div class="box"><div class="brand" style="margin-bottom:8px">${LOGO}${t[0]}</div><div class="muted" style="margin-bottom:14px">${t[1]}</div>
    <button class="btn" type="button" data-act="gate-refresh">تحديث</button>
    <button class="btn soft" type="button" data-act="logout" style="margin-top:8px">تسجيل خروج</button></div></div>`;
 }
@@ -1991,12 +2058,18 @@ async function fpVerify(){
   await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:location.hostname,allowCredentials:[{type:'public-key',id:unb64u(id)}],userVerification:'required',timeout:60000}});
 }
 function lastAtt(uid){return cache.attendance.filter(r=>r.uid===uid).sort((a,b)=>b.ts-a.ts)[0]}
-function nextKind(uid){const l=lastAtt(uid); return l&&l.kind==='in'&&Date.now()-l.ts<18*36e5?'out':'in'}
+function nextKind(uid){
+  const l=lastAtt(uid);
+  if(l&&l.kind==='in'&&Date.now()-l.ts<18*36e5)return 'out';
+  const t=today();
+  return cache.attendance.some(r=>r.uid===uid&&r.date===t&&r.kind==='in')?'done':'in';
+}
 async function attAct(btn){
   const s=attSet();
   if(!s.lat||!s.lng){toast('الأدمن لسه ما حددش موقع المركز');return}
   if(!myCred()){toast('فعّل البصمة الأول');return}
   const uid=session.user.id, kind=nextKind(uid);
+  if(kind==='done'){toast('سجّلت حضورك وانصرافك النهاردة. مفيش تسجيل تاني في نفس اليوم',5000);return}
   btn.disabled=true; const old=btn.textContent; btn.textContent='جاري تحديد موقعك...';
   try{
     let pos; try{pos=await getPos()}catch(e){toast(e&&e.code===1?'اسمح للمتصفح بالوصول للموقع':'مقدرتش أحدد موقعك، اتأكد إن الـ GPS شغال وجرب تاني',6000);return}
@@ -2027,7 +2100,7 @@ function renderAtt(){
   let h=`<div class="box"><h2>الحضور والانصراف</h2>
     <div class="hint" style="margin-bottom:10px">${l?'آخر تسجيل: '+(l.kind==='in'?'حضور':'انصراف')+' '+dshow(l.date)+' '+hm(l.ts):'لسه مفيش تسجيل.'}</div>
     ${!s.lat?'<div class="banner">الأدمن لسه ما حددش موقع المركز.</div>':''}
-    ${myCred()?`<button class="btn" id="att-go" data-act="att-go" style="width:100%;padding:16px;font-size:18px" ${s.lat?'':'disabled'}>${kind==='in'?'تسجيل حضور':'تسجيل انصراف'}</button>`
+    ${myCred()?`<button class="btn" id="att-go" data-act="att-go" style="width:100%;padding:16px;font-size:18px" ${s.lat&&kind!=='done'?'':'disabled'}>${kind==='in'?'تسجيل حضور':kind==='out'?'تسجيل انصراف':'تم تسجيل حضورك وانصرافك النهاردة'}</button>`
       :`<button class="btn" data-act="att-reg" style="width:100%">تفعيل بصمة الموبايل (مرة واحدة)</button><div class="hint" style="margin-top:6px">بتتفعّل مرة على موبايلك، وبعدها كل تسجيل بيتأكد ببصمتك أو وجهك وبموقعك.</div>`}
     <div class="rows" style="margin-top:12px"><div class="row"><span>أيام حضورك الشهر ده</span><span>${sm.days}</span></div><div class="row"><span>ساعات الشهر ده</span><span>${hrs(sm.hours)}</span></div></div></div>
     ${mine.length?`<div class="box"><h3>تسجيلات النهاردة</h3>${mine.map(r=>attRowHtml(r,false)).join('')}</div>`:''}`;
@@ -2071,6 +2144,128 @@ document.addEventListener('click',async e=>{
     try{const p=await getPos(); $('#at-lat').value=p.coords.latitude.toFixed(6); $('#at-lng').value=p.coords.longitude.toFixed(6); toast('اتحدد موقعك (دقة '+Math.round(p.coords.accuracy)+' متر). دوس حفظ',5000)}
     catch(x){toast('مقدرتش أحدد موقعك، اسمح للمتصفح بالموقع')}
     b.disabled=false; b.textContent=o;
+  }
+});
+
+
+/* ================= v2.1: groups, who-did-it, audit, appearance ================= */
+const byWho=()=>{const n=myMemberName(); return n&&n!=='—'?String(n).split('@')[0]:''};
+async function audit(action,text){
+  try{ await http('/rest/v1/docs?on_conflict=collection,id',{method:'POST',body:{collection:'audit',id:newId(),data:{ts:Date.now(),by:byWho(),action,text:String(text||'')}},headers:{Prefer:'resolution=merge-duplicates,return=minimal'}}); }
+  catch(e){ console.warn('audit',e); }
+}
+function rangeOf(p,r){
+  if(p==='day')return {from:r,to:r};
+  if(p==='week'){const back=(parse(r).getDay()+1)%7;const f=addDays(r,-back);return {from:f,to:addDays(f,6)}}
+  return monthRangeOf(r);
+}
+function flowHtml(){
+  const ds=devs();
+  const created=d=>d.createdAt?iso(new Date(d.createdAt)):d.entryDate;
+  const row=(l,p)=>{const R=rangeOf(p,today()); const a=ds.filter(d=>inR(created(d),R)).length, o=ds.filter(d=>d.status==='done'&&inR(d.deliveredAt,R)).length;
+    return `<div class="row"><span>${l}</span><span>دخل <b class="num">${a}</b> · خرج <b class="num">${o}</b></span></div>`};
+  return `<div class="box"><h2>حركة الأجهزة</h2><div class="rows">${row('النهاردة','day')}${row('الأسبوع ده','week')}${row('الشهر ده','month')}</div></div>`;
+}
+function lossesHtml(){
+  const ls=[...cache.losses].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40);
+  return `<div class="box"><div class="head"><h2 style="margin:0">خسائر صيانة</h2><button class="btn sm" data-act="new-loss">+ خسارة</button></div>
+   ${ls.length?ls.map(l=>{const d=devs().find(x=>x.id===l.deviceId);return `<div class="item"><div class="t"><b>${esc(l.reason||'بدون سبب')}</b><div>${dshow(l.date)}${d?' · '+esc(d.customer||'')+' '+esc(d.model||''):''}</div>${l.by?`<div class="by">${esc(l.by)}</div>`:''}</div><span class="crit">${money(l.amount)}</span><button class="btn sm danger" data-act="del-loss" data-id="${esc(l.id)}">حذف</button></div>`}).join(''):`<div class="hint">شاشة اتكسرت وانت بتركبها، أو تعويض عميل؟ سجله هنا${isAdmin?' عشان يتخصم من الربح':''}.</div>`}</div>`;
+}
+function auditHtml(){
+  const rows=[...cache.audit].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,40);
+  return `<div class="box"><h2>سجل الحذف</h2>${rows.length?rows.map(r=>`<div class="item"><div class="t"><b>${esc(r.action||'')}</b><div>${esc(r.text||'')}</div><div class="by">${esc(r.by||'—')} · ${dshow(iso(new Date(r.ts||0)))} ${hm(r.ts||0)}</div></div></div>`).join(''):'<div class="hint">أي حذف بيعمله حد من التيم بيظهر هنا باسمه.</div>'}</div>`;
+}
+function appearanceHtml(){
+  const chips=(k,list)=>list.map(([v,l,sw])=>`<button type="button" class="chip ${PREFS[k]===v?'on':''}" data-pref="${k}" data-v="${v}">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${l}</button>`).join('');
+  return `<div class="box"><h3>المظهر (على الجهاز ده)</h3>
+   <div class="hint" style="margin-bottom:6px">اللون الأساسي (واللوجو بيتلون بيه)</div>
+   <div class="chips" style="flex-wrap:wrap;overflow:visible">${chips('color',Object.entries(PAL).map(([k,v])=>[k,v.n,v.l[0]]))}</div>
+   <div class="hint" style="margin:8px 0 6px">الوضع</div>
+   <div class="chips" style="flex-wrap:wrap;overflow:visible">${chips('mode',[['auto','تلقائي زي الموبايل'],['light','فاتح'],['dark','ليلي']])}</div>
+   <div class="hint" style="margin:8px 0 6px">الخط</div>
+   <div class="chips" style="flex-wrap:wrap;overflow:visible">${chips('font',Object.entries(FONTS).map(([k,v])=>[k,v.n]))}</div>
+   <div class="hint">شكل الخطوط بيختلف حسب الخطوط المتاحة على الموبايل أو الكمبيوتر.</div></div>`;
+}
+
+/* ----- clickable summary groups ----- */
+const GROUPS={in:'أجهزة دخلت النهاردة',out:'اتسلم النهاردة',open:'لسه شغالين عليها',wait:'في الانتظار',check:'جاري الفحص',part:'مستنية قطعة غيار',ready:'جاهزة للتسليم',stale:'متأخرة من غير تحديث'};
+const NEXT={wait:['check','ابدأ الفحص'],check:['ready','تم الإصلاح ← جاهز للتسليم'],part:['check','وصلت القطعة ← جاري الفحص']};
+function groupDevs(k){
+  const ds=devs(), t=today(), created=d=>d.createdAt?iso(new Date(d.createdAt)):d.entryDate;
+  if(k==='in')return ds.filter(d=>created(d)===t);
+  if(k==='out')return ds.filter(d=>d.status==='done'&&d.deliveredAt===t);
+  if(k==='open')return ds.filter(d=>d.status!=='done');
+  if(k==='ready')return ds.filter(d=>d.status==='ready'||d.status==='hold');
+  if(k==='stale')return ds.filter(isStale);
+  if(k==='wait'||k==='check'||k==='part')return ds.filter(d=>d.status===k);
+  return [];
+}
+function openGroup(k){
+  S.modal={type:'group',k};
+  showModal(sheetHtml(esc(GROUPS[k]||''),'<div id="grpList"></div>'));
+  refreshGroup();
+}
+function grpRow(d){
+  const st=STM[d.status]||STM.wait, paid=paidOf(d), left=num(d.price)-paid, we=warrantyEnd(d), id=esc(d.id);
+  let nxt='';
+  if(d.status==='ready'||d.status==='hold')nxt=`<button class="btn sm" data-act="deliver" data-id="${id}">تم التسليم</button>`;
+  else if(NEXT[d.status])nxt=`<button class="btn sm" data-act="grp-move" data-id="${id}" data-k="${NEXT[d.status][0]}">${NEXT[d.status][1]}</button>`;
+  const other=d.status==='check'?`<button class="btn sm soft" data-act="grp-move" data-id="${id}" data-k="part">محتاج قطعة</button>`:'';
+  const parts=(d.parts||[]).map(p=>esc(p.name)).join('، ');
+  const pay=num(d.price)>0?`<span>دفع <b class="num">${fmt(paid)}</b> · متبقي <b class="num ${left>0?'crit':'good'}">${fmt(Math.max(0,left))}</b></span>`:'<span class="muted">لسه مفيش مبلغ متفق عليه</span>';
+  const warr=we?` · ${we>=today()?'ضمان لحد '+dshow(we):'الضمان خلص '+dshow(we)}`:'';
+  return `<div class="grow"><div class="gh"><button type="button" data-act="open-dev" data-id="${id}" style="background:none;border:0;text-align:start;padding:0;cursor:pointer;color:inherit"><b>#${String(d.no||0).padStart(4,'0')} · ${esc(d.customer||'بدون اسم')}</b></button><span class="pill ${st.c}">${st.l}</span></div>
+   <div class="gs">${esc(d.model||'')}${d.issue?' · '+esc(d.issue):''}${d.urgent?' · <b class="crit">عاجل جدًا</b>':''}</div>
+   <div class="gs">${pay}${warr}${d.addedBy?' · سجّله '+esc(d.addedBy):''}</div>
+   ${parts?`<div class="gs">القطع: ${parts}</div>`:''}
+   <div class="ga">${nxt}${other}<button class="btn sm ghost" data-act="open-dev" data-id="${id}">فتح الجهاز</button></div>
+   <details data-id="${id}"><summary>+ إضافة قطعة غيار</summary><div class="form" style="margin-top:8px">
+     <div class="g2">${field('اسم القطعة',`<input id="gp-name-${id}" placeholder="شاشة / آي سي">`)}${field('التكلفة (ج)',`<input id="gp-price-${id}" type="number" inputmode="decimal" step="any" min="0">`)}</div>
+     ${field('التاجر (اختياري)',`<input id="gp-sup-${id}" list="dl-suppliers">`)}
+     <button class="btn soft sm" type="button" data-act="grp-part" data-id="${id}">إضافة القطعة</button></div></details></div>`;
+}
+function refreshGroup(){
+  const box=$('#grpList'); if(!box||!S.modal||S.modal.type!=='group')return;
+  const ae=document.activeElement;
+  if(ae&&box.contains(ae)&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))return;
+  const typed={}, opened=new Set();
+  box.querySelectorAll('input[id]').forEach(i=>{if(i.value)typed[i.id]=i.value});
+  box.querySelectorAll('details[open]').forEach(d=>opened.add(d.dataset.id));
+  const list=groupDevs(S.modal.k).sort((a,b)=>(b.urgent?1:0)-(a.urgent?1:0)||(b.createdAt||0)-(a.createdAt||0));
+  box.innerHTML=list.length?`<div class="hint" style="margin-bottom:6px">${devicesWord(list.length)}</div>`+list.map(grpRow).join(''):'<div class="empty" style="border:0"><b>مفيش أجهزة هنا دلوقتي</b></div>';
+  box.querySelectorAll('details').forEach(d=>{if(opened.has(d.dataset.id))d.open=true});
+  Object.entries(typed).forEach(([k,v])=>{const el=document.getElementById(k); if(el)el.value=v});
+  attachMics(box);
+}
+function openFault(key){
+  const ds=devs().filter(d=>String(d.issue||'').trim().toLowerCase()===key);
+  const name=(ds[0]&&String(ds[0].issue).trim())||key;
+  const m={}; ds.forEach(d=>{const k=String(d.model||'').trim()||'موديل غير مكتوب'; const o=m[k.toLowerCase()]||(m[k.toLowerCase()]={k,n:0}); o.n++});
+  const arr=Object.values(m).sort((a,b)=>b.n-a.n), mx=Math.max(1,...arr.map(o=>o.n));
+  S.modal={type:'fault'};
+  showModal(sheetHtml(esc(name),`<div class="box"><div class="hint" style="margin-bottom:6px">أكتر الموديلات اللي دخلت بالعطل ده (${devicesWord(ds.length)})</div>${arr.map(o=>`<div class="brow"><div class="top2"><b>${esc(o.k)}</b><span class="num">${o.n} مرة</span></div><div class="bar"><i style="width:${Math.max(2,Math.round(o.n/mx*100))}%"></i></div></div>`).join('')}</div>`));
+}
+document.addEventListener('click',async e=>{
+  const pf=e.target.closest('[data-pref]'); if(pf){setPref(pf.dataset.pref,pf.dataset.v);return}
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const a=b.dataset.act, id=b.dataset.id;
+  if(a==='grp')return openGroup(b.dataset.k);
+  if(a==='fault-open')return openFault(b.dataset.k);
+  if(a==='grp-move'){
+    const dv=devs().find(x=>x.id===id); if(!dv)return;
+    const k=b.dataset.k; if(k===dv.status)return;
+    await devPatch(dv.id,{status:k,statusAt:Date.now(),deliveredAt:'',statusBy:byWho()}); return;
+  }
+  if(a==='grp-part'){
+    const dv=devs().find(x=>x.id===id); if(!dv)return;
+    const nm=document.getElementById('gp-name-'+id), pr=document.getElementById('gp-price-'+id), sp=document.getElementById('gp-sup-'+id);
+    const name=nm.value.trim(); if(!name){toast('اكتب اسم القطعة');return}
+    const part={id:'p'+Date.now().toString(36),name,supplier:sp.value.trim(),price:num(pr.value),shipping:0,date:today(),by:byWho()};
+    const warn=cheaperFor(part.name,part.price,part.supplier);
+    const bk=[nm.value,pr.value,sp.value]; nm.value=''; pr.value=''; sp.value='';
+    const ok=await devPatch(dv.id,{parts:[...(dv.parts||[]),part]});
+    if(!ok){nm.value=bk[0];pr.value=bk[1];sp.value=bk[2]} else toast(warn||'اتضافت القطعة على الجهاز',warn?8000:0);
+    return;
   }
 });
 
