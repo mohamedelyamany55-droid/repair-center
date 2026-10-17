@@ -2064,10 +2064,27 @@ function nextKind(uid){
   const t=today();
   return cache.attendance.some(r=>r.uid===uid&&r.date===t&&r.kind==='in')?'done':'in';
 }
+function askPassword(){
+  return new Promise(res=>{
+    const w=document.createElement('div');
+    w.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    w.innerHTML='<form class="box" style="width:100%;max-width:360px;margin:0"><h2>تأكيد بكلمة السر</h2><div class="hint" style="margin-bottom:8px">اكتب كلمة سر حسابك في التطبيق.</div><input id="pw-in" type="password" autocomplete="current-password" style="width:100%" required><div class="acts" style="margin-top:10px"><button class="btn" type="submit">تأكيد</button><button class="btn soft" type="button" id="pw-x">إلغاء</button></div></form>';
+    document.body.appendChild(w);
+    const done=v=>{w.remove();res(v)};
+    w.querySelector('#pw-x').onclick=()=>done(null);
+    w.querySelector('form').onsubmit=e=>{e.preventDefault();done(w.querySelector('#pw-in').value)};
+    setTimeout(()=>{try{w.querySelector('#pw-in').focus()}catch(e){}},50);
+  });
+}
+async function pwVerify(){
+  const pw=await askPassword(); if(pw===null)throw {cancel:true};
+  const email=session&&session.user&&session.user.email;
+  try{await http('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email,password:pw}})}
+  catch(e){throw {badpw:true}}
+}
 async function attAct(btn){
-  const s=attSet();
+  const s=attSet(), usePw=btn.dataset.mode==='pw'||!myCred();
   if(!s.lat||!s.lng){toast('الأدمن لسه ما حددش موقع المركز');return}
-  if(!myCred()){toast('فعّل البصمة الأول');return}
   const uid=session.user.id, kind=nextKind(uid);
   if(kind==='done'){toast('سجّلت حضورك وانصرافك النهاردة. مفيش تسجيل تاني في نفس اليوم',5000);return}
   btn.disabled=true; const old=btn.textContent; btn.textContent='جاري تحديد موقعك...';
@@ -2075,10 +2092,14 @@ async function attAct(btn){
     let pos; try{pos=await getPos()}catch(e){toast(e&&e.code===1?'اسمح للمتصفح بالوصول للموقع':'مقدرتش أحدد موقعك، اتأكد إن الـ GPS شغال وجرب تاني',6000);return}
     const d=distM(pos.coords.latitude,pos.coords.longitude,Number(s.lat),Number(s.lng)), rad=Number(s.radius)||100;
     if(d>rad){toast('إنت بعيد عن المركز بحوالي '+Math.round(d)+' متر. لازم تكون جوه '+rad+' متر',7000);return}
-    btn.textContent='أكّد بالبصمة...';
-    try{await fpVerify()}catch(e){toast(e&&e.nofp?'فعّل البصمة الأول':'البصمة ماتأكدتش',5000);return}
+    if(usePw){
+      try{await pwVerify()}catch(e){if(!(e&&e.cancel))toast('كلمة السر غلط',5000);return}
+    }else{
+      btn.textContent='أكّد بالبصمة...';
+      try{await fpVerify()}catch(e){toast('البصمة ماتأكدتش. تقدر تسجّل بكلمة السر بدلها',6000);return}
+    }
     const now=Date.now();
-    if(await safe(()=>put('attendance',newId(),{uid,name:myMemberName(),kind,ts:now,date:iso(new Date(now)),lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy||0),dist:Math.round(d),fp:1})))toast(kind==='in'?'اتسجل حضورك '+hm(now):'اتسجل انصرافك '+hm(now),5000);
+    if(await safe(()=>put('attendance',newId(),{uid,name:myMemberName(),kind,ts:now,date:iso(new Date(now)),lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy||0),dist:Math.round(d),fp:usePw?0:1,pw:usePw?1:0})))toast(kind==='in'?'اتسجل حضورك '+hm(now):'اتسجل انصرافك '+hm(now),5000);
   }finally{btn.disabled=false;btn.textContent=old}
 }
 function attSummary(uid,month){
@@ -2089,7 +2110,7 @@ function attSummary(uid,month){
 }
 const hrs=h=>{const m=Math.round(h*60);return Math.floor(m/60)+' س '+pad(m%60)+' د'};
 function attRowHtml(r,admin){
-  return `<div class="item"><div class="t"><b>${esc(r.name||'—')}</b> <span class="qual">${r.kind==='in'?'حضور':'انصراف'}</span><div>${dshow(r.date)} · ${hm(r.ts)}${r.manual?' · يدوي'+(r.note?' ('+esc(r.note)+')':''):(r.dist!=null?' · '+r.dist+' م من المركز':'')}</div></div>${admin?`<button class="btn sm danger" data-act="att-del" data-id="${esc(r.id)}">حذف</button>`:''}</div>`;
+  return `<div class="item"><div class="t"><b>${esc(r.name||'—')}</b> <span class="qual">${r.kind==='in'?'حضور':'انصراف'}</span><div>${dshow(r.date)} · ${hm(r.ts)}${r.manual?' · يدوي'+(r.note?' ('+esc(r.note)+')':''):(r.dist!=null?' · '+r.dist+' م من المركز'+(r.pw?' · بكلمة سر':''):'')}</div></div>${admin?`<button class="btn sm danger" data-act="att-del" data-id="${esc(r.id)}">حذف</button>`:''}</div>`;
 }
 function renderAtt(){
   const box=$('#attBox'); if(!box)return;
@@ -2100,8 +2121,10 @@ function renderAtt(){
   let h=`<div class="box"><h2>الحضور والانصراف</h2>
     <div class="hint" style="margin-bottom:10px">${l?'آخر تسجيل: '+(l.kind==='in'?'حضور':'انصراف')+' '+dshow(l.date)+' '+hm(l.ts):'لسه مفيش تسجيل.'}</div>
     ${!s.lat?'<div class="banner">الأدمن لسه ما حددش موقع المركز.</div>':''}
-    ${myCred()?`<button class="btn" id="att-go" data-act="att-go" style="width:100%;padding:16px;font-size:18px" ${s.lat&&kind!=='done'?'':'disabled'}>${kind==='in'?'تسجيل حضور':kind==='out'?'تسجيل انصراف':'تم تسجيل حضورك وانصرافك النهاردة'}</button>`
-      :`<button class="btn" data-act="att-reg" style="width:100%">تفعيل بصمة الموبايل (مرة واحدة)</button><div class="hint" style="margin-top:6px">بتتفعّل مرة على موبايلك، وبعدها كل تسجيل بيتأكد ببصمتك أو وجهك وبموقعك.</div>`}
+    ${(()=>{const lbl=kind==='in'?'تسجيل حضور':kind==='out'?'تسجيل انصراف':'تم تسجيل حضورك وانصرافك النهاردة', dis=s.lat&&kind!=='done'?'':'disabled';
+      const pwb=`<button class="btn ${myCred()?'soft':''}" data-act="att-go" data-mode="pw" style="width:100%;margin-top:8px" ${dis}>${kind==='done'?lbl:lbl+' بكلمة السر'}</button>`;
+      return myCred()?`<button class="btn" id="att-go" data-act="att-go" style="width:100%;padding:16px;font-size:18px" ${dis}>${lbl}</button>${kind==='done'?'':pwb.replace('btn soft','btn soft').replace('>'+lbl+' بكلمة السر','>البصمة مش شغالة؟ '+lbl+' بكلمة السر')}`
+      :`${pwb.replace('class="btn "','class="btn" id="att-go"').replace('width:100%;margin-top:8px','width:100%;padding:16px;font-size:18px')}<button class="btn soft" data-act="att-reg" style="width:100%;margin-top:8px">تفعيل بصمة الموبايل (اختياري)</button><div class="hint" style="margin-top:6px">تقدر تسجّل بكلمة السر من غير بصمة. وكل التسجيلات بتتأكد بموقعك برضه.</div>`})()}
     <div class="rows" style="margin-top:12px"><div class="row"><span>أيام حضورك الشهر ده</span><span>${sm.days}</span></div><div class="row"><span>ساعات الشهر ده</span><span>${hrs(sm.hours)}</span></div></div></div>
     ${mine.length?`<div class="box"><h3>تسجيلات النهاردة</h3>${mine.map(r=>attRowHtml(r,false)).join('')}</div>`:''}`;
   if(isAdmin){
