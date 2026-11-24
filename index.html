@@ -961,7 +961,7 @@ const SESSION_KEY='rc_session_v1';
 const POLL_MS=20000;
 const COLS=['devices','inventory','expenses','losses','fin_settings','settings'];
 const cache={}; COLS.forEach(c=>cache[c]=[]);
-let session=null, pollT=null, isAdmin=false, refreshing=null, busy=0;
+let session=null, pollT=null, isAdmin=false, canFin=false, refreshing=null, busy=0;
 
 /* a visible error box, so a script problem never ends as a silent white page */
 let errShown=false;
@@ -1107,7 +1107,7 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&session)
 
 /* ---------- auth: login screen, account sheet ---------- */
 function handleSignedOut(msg){
-  stopPoll(); COLS.forEach(c=>cache[c]=[]); isAdmin=false; if(S.modal)closeModal();
+  stopPoll(); COLS.forEach(c=>cache[c]=[]); isAdmin=false; canFin=false; if(S.modal)closeModal();
   showLogin(msg);
 }
 function showLogin(msg){
@@ -1160,7 +1160,7 @@ async function startApp(){
   $('#app').hidden=false; $('.nav').hidden=false;
   try{ const r=await http('/rest/v1/rpc/is_admin',{method:'POST',body:{}}); isAdmin=(r===true); }
   catch(e){ isAdmin=false; console.warn(e); if(e.code==='network')setBar('مفيش اتصال بالنت.'); }
-  if(!isAdmin){ const gs=await memberStatus(true); if(gs!=='ok'){showGate(gs);return} }
+  if(!isAdmin){ const gs=await memberStatus(true); if(gs!=='ok'){showGate(gs);return} try{ canFin=(await http('/rest/v1/rpc/can_see_finance',{method:'POST',body:{}}))===true; }catch(e){ canFin=false; } }
   if(!isAdmin&&S.tab==='set')S.tab='devices';
   renderTab(); loadAll(); startPoll();
 }
@@ -1382,7 +1382,7 @@ function renderTab(){
       <div class="chips" id="cchips"></div><div id="stocksum"></div><div class="box" id="stocklist"></div>
       <div class="box"><h3>مقارنة أسعار التجار</h3><input class="search" id="pc-q" type="search" placeholder="اسم القطعة (مثال: شاشة A52)" style="width:100%"><div id="pcres" style="margin-top:8px"></div></div><div id="quotes"></div><div id="rets"></div>`;
   } else if(S.tab==='money'){
-    if(!isAdmin){v.innerHTML=`<div id="flow"></div><div id="balance"></div><div id="incomes"></div><div id="exps"></div><div id="losses"></div><div id="debts"></div><div id="tools"></div>`;}
+    if(!(isAdmin||canFin)){v.innerHTML=`<div id="flow"></div><div id="balance"></div><div id="incomes"></div><div id="exps"></div><div id="losses"></div><div id="debts"></div><div id="tools"></div>`;}
     else v.innerHTML=`<div class="seg" id="seg"></div>
       <div class="datebar"><span>التاريخ المرجعي</span><input class="search" id="ref" type="date" style="flex:none" value="${S.ref}"></div>
       <div class="acts"><button class="btn soft" data-act="monthly-report">تقرير الشهر للطباعة</button></div><div id="report"></div><div id="balance"></div><div id="incomes"></div><div id="payroll"></div><div id="debts"></div><div id="tools"></div><div id="stats"></div><div id="msgs"></div><div id="exps"></div><div id="losses"></div>`;
@@ -1403,7 +1403,7 @@ function renderData(){
   if(S.tab==='devices'){renderDash();renderAlerts();renderChips();renderFbar();renderDevList();}
   else if(S.tab==='stock'){renderStock();renderCompare();renderQuotes();renderRets();}
   else if(S.tab==='kb'){renderKb();}
-  else if(S.tab==='money'){if(isAdmin){renderMoney();renderMoneyExtra();}else renderStaffMoney();}
+  else if(S.tab==='money'){if(isAdmin||canFin){renderMoney();renderMoneyExtra();}else renderStaffMoney();}
   else if(S.tab==='me')renderMe();
   else if(S.tab==='att')renderAtt();
   else renderSettings();
@@ -3271,7 +3271,7 @@ function renderTab(){
       <div id="stocksum"></div><div id="stockbody"></div>
       ${secBox('stockx','💱 أسعار التجار والمقارنة',`<h3>مقارنة أسعار التجار</h3><input class="search" id="pc-q" type="search" placeholder="اسم القطعة (مثال: شاشة A52)" style="width:100%"><div id="pcres" style="margin-top:8px"></div><div id="quotes" style="margin-top:12px"></div><div id="rets" style="margin-top:12px"></div>`)}`;
   } else if(S.tab==='money'){
-    if(!isAdmin){v.innerHTML=`<div id="flow"></div><div id="drawer"></div><div id="transfers"></div><div id="balance"></div><div id="incomes"></div><div id="exps"></div><div id="losses"></div><div id="debts"></div><div id="tools"></div>`;}
+    if(!(isAdmin||canFin)){v.innerHTML=`<div id="flow"></div><div id="drawer"></div><div id="transfers"></div><div id="balance"></div><div id="incomes"></div><div id="exps"></div><div id="losses"></div><div id="debts"></div><div id="tools"></div>`;}
     else v.innerHTML=`<div class="perrow" id="seg"></div>
       <div class="datebar big"><span>📅 التاريخ المرجعي</span><input class="search" id="ref" type="date" style="flex:none" value="${S.ref}"></div>
       <div class="acts"><button class="btn soft" data-act="voice-report">🔊 تقرير صوتي</button><button class="btn soft" data-act="monthly-report">🖨️ تقرير الشهر للطباعة</button></div><div id="report"></div><div id="drawer"></div><div id="transfers"></div><div id="balance"></div><div id="incomes"></div><div id="payroll"></div><div id="debts"></div><div id="tools"></div><div id="exps"></div><div id="losses"></div>`;
@@ -3293,7 +3293,7 @@ function renderData(){
   else if(S.tab==='alerts')renderAlertsTab();
   else if(S.tab==='stock'){renderStock();renderCompare();renderQuotes();renderRets();}
   else if(S.tab==='kb'){renderKb();}
-  else if(S.tab==='money'){if(isAdmin){renderMoney();renderMoneyExtra();}else renderStaffMoney();}
+  else if(S.tab==='money'){if(isAdmin||canFin){renderMoney();renderMoneyExtra();}else renderStaffMoney();}
   else if(S.tab==='me')renderMe();
   else if(S.tab==='att')renderAtt();
   else renderSettings();
