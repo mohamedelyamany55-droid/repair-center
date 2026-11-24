@@ -1213,6 +1213,110 @@ async function boot(){
 }
 
 /* ---------- derived data ---------- */
+const Fin=(function(){var module=undefined;var self={};/* حسابات الفلوس: دوال صافية (من غير شاشة ولا إنترنت) عشان تتختبر لوحدها.
+   بتشتغل في المتصفح وفي Node. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Fin = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  var EPS = 0.0001;
+
+  function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+
+  // تكلفة قطع الغيار + الشحن على جهاز واحد
+  function partsCost(d) {
+    return ((d && d.parts) || []).reduce(function (s, p) { return s + num(p.price) + num(p.shipping); }, 0);
+  }
+  // اللي اتدفع على الجهاز
+  function paidOf(d) {
+    return ((d && d.payments) || []).reduce(function (s, p) { return s + num(p.amount); }, 0);
+  }
+  // المتبقي على العميل (عمره ما يبقى بالسالب)
+  function remaining(d) { return Math.max(0, num(d && d.price) - paidOf(d)); }
+
+  // ربح جهاز واحد = سعر البيع − تكلفة القطع
+  function deviceProfit(d) { return num(d && d.price) - partsCost(d); }
+
+  // الأجهزة اللي اتسلمت في الفترة R = {from,to} (تواريخ yyyy-mm-dd)
+  function deliveredIn(devices, R) {
+    return (devices || []).filter(function (d) {
+      return d.status === 'done' && d.deliveredAt && d.deliveredAt >= R.from && d.deliveredAt <= R.to;
+    });
+  }
+  function inRange(x, R) { return !!x && x >= R.from && x <= R.to; }
+  function sumAmount(list, R) {
+    return (list || []).filter(function (x) { return inRange(x.date, R); })
+      .reduce(function (s, x) { return s + num(x.amount); }, 0);
+  }
+
+  // تقرير فترة: الإيراد والتكلفة بيتحسبوا على الأجهزة اللي اتسلمت في نفس الفترة
+  function periodReport(devices, losses, expenses, R) {
+    var done = deliveredIn(devices, R);
+    var revenue = done.reduce(function (s, d) { return s + num(d.price); }, 0);
+    var costs = done.reduce(function (s, d) { return s + partsCost(d); }, 0);
+    var lossP = sumAmount(losses, R), expP = sumAmount(expenses, R);
+    var collected = (devices || []).reduce(function (s, d) {
+      return s + (d.payments || []).filter(function (p) { return inRange(p.date, R); })
+        .reduce(function (a, p) { return a + num(p.amount); }, 0);
+    }, 0);
+    var uncollected = done.reduce(function (s, d) { return s + remaining(d); }, 0);
+    var wip = (devices || []).filter(function (d) { return d.status !== 'done'; })
+      .reduce(function (s, d) { return s + partsCost(d); }, 0);
+    return {
+      count: done.length, revenue: revenue, costs: costs,
+      grossProfit: revenue - costs, losses: lossP, expenses: expP,
+      net: revenue - costs - lossP - expP,
+      collected: collected, uncollected: uncollected, wipParts: wip
+    };
+  }
+
+  // الدين زي ما يتعرض: لو مربوط بجهاز، المتبقي بيتحسب من سعر الجهاز − المدفوع.
+  // لو دين عادي، المتبقي = المبلغ − الدفعات الجزئية.
+  function debtView(debt, devices) {
+    var orig = num(debt.amount), left, paid;
+    var dv = debt.devId ? (devices || []).filter(function (x) { return x.id === debt.devId; })[0] : null;
+    if (dv) {
+      left = remaining(dv);
+      paid = left <= EPS;
+    } else {
+      var part = (debt.payments || []).reduce(function (s, p) { return s + num(p.amount); }, 0);
+      left = Math.max(0, orig - part);
+      paid = !!debt.paid || left <= EPS;
+    }
+    return { original: orig, left: paid ? 0 : left, paidPart: Math.max(0, orig - left), paid: paid, linked: !!dv };
+  }
+
+  // إجمالي لينا / علينا (الديون اللي لسه فيها متبقي بس)
+  function debtTotals(debts, devices) {
+    var t = { forMe: 0, onMe: 0 };
+    (debts || []).forEach(function (x) {
+      var v = debtView(x, devices);
+      if (v.paid) return;
+      if (x.dir === 'for') t.forMe += v.left; else t.onMe += v.left;
+    });
+    return t;
+  }
+
+  // إضافة دفعة جزئية على دين عادي (بترجع نسخة جديدة، ومبتزودش عن المتبقي)
+  function addDebtPayment(debt, amount, date, by) {
+    var a = num(amount);
+    var v = debtView(debt, []);
+    if (a <= 0) return null;
+    a = Math.min(a, v.left);
+    var pays = (debt.payments || []).concat([{ amount: a, date: date, by: by || '' }]);
+    var out = Object.assign({}, debt, { payments: pays });
+    var left = Math.max(0, num(debt.amount) - pays.reduce(function (s, p) { return s + num(p.amount); }, 0));
+    out.paid = left <= EPS;
+    return out;
+  }
+
+  return { num: num, partsCost: partsCost, paidOf: paidOf, remaining: remaining,
+    deviceProfit: deviceProfit, deliveredIn: deliveredIn, periodReport: periodReport,
+    debtView: debtView, debtTotals: debtTotals, addDebtPayment: addDebtPayment };
+});
+
+return self.Fin;})();
 const settings=()=>cache.settings.find(x=>x.id==='main')||{};
 const finSettings=()=>cache.fin_settings.find(x=>x.id==='main')||{};
 const alertDays=()=>{const n=Number(settings().alertDays);return n>0?n:7};
@@ -1221,9 +1325,8 @@ const priMid=()=>{const n=Number(settings().priMid);return n>0?n:200};
 const teamNames=()=>[...new Set([...(settings().team||[]),...cache.members.filter(m=>m.approved&&!m.disabled).map(m=>(m.name||'').trim()).filter(Boolean)])];
 const devs=()=>cache.devices;
 const partCost=d=>(d.parts||[]).reduce((s,p)=>s+num(p.price)+num(p.shipping),0);
-/* a part is deducted from profit on the day it was logged (older parts without a date fall back to the device's dates) */
-const partDate=(p,d)=>p.date||d.deliveredAt||(d.createdAt?iso(new Date(d.createdAt)):(d.entryDate||''));
-const partsLoggedIn=(R)=>devs().reduce((s,d)=>s+(d.parts||[]).filter(p=>{const x=partDate(p,d);return x&&x>=R.from&&x<=R.to}).reduce((a,p)=>a+num(p.price)+num(p.shipping),0),0);
+/* تكلفة القطع بتتحسب على الأجهزة اللي اتسلمت في الفترة (نفس يوم الإيراد) */
+const deliveredPartsCost=R=>Fin.deliveredIn(devs(),R).reduce((s,d)=>s+Fin.partsCost(d),0);
 const paidOf=d=>(d.payments||[]).reduce((s,p)=>s+num(p.amount),0);
 const linkedLoss=d=>cache.losses.filter(l=>l.deviceId===d.id).reduce((s,l)=>s+num(l.amount),0);
 function isStale(d){ if(d.status==='done')return false; const t=d.statusAt||d.createdAt||0; return t&&(Date.now()-t)/864e5>=alertDays(); }
@@ -1614,7 +1717,7 @@ function renderMoney(){
   const R=range();
   const done=devs().filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
   const revenue=done.reduce((s,d)=>s+num(d.price),0);
-  const costs=partsLoggedIn(R);
+  const costs=deliveredPartsCost(R);
   const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0);
   const expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
   const net=revenue-costs-lossP-expP;
@@ -1622,7 +1725,7 @@ function renderMoney(){
   const collected=devs().reduce((s,d)=>s+(d.payments||[]).filter(p=>inR(p.date,R)).reduce((a,p)=>a+num(p.amount),0),0);
   $('#report').innerHTML=`<div class="box"><h2>${esc(R.label)}</h2><div class="rows">
     <div class="row"><span>إيراد ${devicesWord(done.length)} اتسلموا</span><span>${money(revenue)}</span></div>
-    <div class="row"><span>قطع الغيار والشحن (اللي اتسجلت في الفترة)</span><span class="crit">− ${money(costs)}</span></div>
+    <div class="row"><span>تكلفة قطع الأجهزة اللي اتسلمت</span><span class="crit">− ${money(costs)}</span></div>
     <div class="row"><span>خسائر صيانة</span><span class="crit">− ${money(lossP)}</span></div>
     <div class="row"><span>مصاريف تشغيلية</span><span class="crit">− ${money(expP)}</span></div>
     <div class="row total"><span>صافي الربح</span><span class="${net>=0?'good':'crit'}">${money(net)}</span></div>
@@ -2029,7 +2132,7 @@ function renderDash(){
   const el=$('#dash'); if(!el)return;
   const ds=devs(), t=today(), n=k=>groupDevs(k).length;
   const doneToday=groupDevs('out');
-  const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-partsLoggedIn({from:t,to:t});
+  const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-deliveredPartsCost({from:t,to:t});
   let sw=0; ds.forEach(d=>(d.parts||[]).forEach(p=>{const i=swInfo(p); if(i&&i.left>=0&&i.left<=7)sw++}));
   const low=cache.inventory.filter(i=>num(i.min)>0&&num(i.qty)<=num(i.min)).length;
   const hr=new Date().getHours(), greet=hr<12?'صباح الخير':hr<18?'نهارك سعيد':'مساء الخير';
@@ -2211,9 +2314,9 @@ function openDeliverChoice(id){
 }
 function debtsHtml(){
   const items=slist('debts','items');
-  const open=items.filter(x=>!x.paid), forMe=open.filter(x=>x.dir==='for').reduce((s,x)=>s+num(x.amount),0), onMe=open.filter(x=>x.dir==='on').reduce((s,x)=>s+num(x.amount),0);
+  const dt=Fin.debtTotals(items,devs()), forMe=dt.forMe, onMe=dt.onMe;
   const bal=cashBalance();
-  const list=[...items].sort((a,b)=>(!!a.paid-!!b.paid)||String(b.date).localeCompare(String(a.date))).map(x=>`<div class="item"><div class="t"><b>${esc(x.who||'—')}</b> <span class="qual">${x.dir==='for'?'لينا':'علينا'}</span>${x.paid?' <span class="qual">اتسدد</span>':''}<div>${dshow(x.date)}${x.note?' · '+esc(x.note):''}</div>${x.by?`<div class="by">${esc(x.by)}</div>`:''}</div><span class="${x.dir==='for'?'good':'crit'}">${money(x.amount)}</span><button class="btn sm soft" data-act="debt-toggle" data-id="${esc(x.id)}">${x.paid?'رجّع':'تم السداد'}</button><button class="btn sm danger" data-act="debt-del" data-id="${esc(x.id)}">حذف</button></div>`).join('');
+  const list=[...items].map(x=>({x,v:Fin.debtView(x,devs())})).sort((a,b)=>(!!a.v.paid-!!b.v.paid)||String(b.x.date).localeCompare(String(a.x.date))).map(({x,v})=>`<div class="item"><div class="t"><b>${esc(x.who||'—')}</b> <span class="qual">${x.dir==='for'?'لينا':'علينا'}</span>${v.paid?' <span class="qual">اتسدد</span>':''}<div>${dshow(x.date)}${x.note?' · '+esc(x.note):''}</div>${x.by?`<div class="by">${esc(x.by)}</div>`:''}</div><span class="${x.dir==='for'?'good':'crit'}">${v.paid?money(v.original):'المتبقي '+money(v.left)}${(!v.paid&&v.paidPart>0)?`<div class="by">من ${fmt(v.original)} · اتدفع ${fmt(v.paidPart)}</div>`:''}</span>${(!v.paid&&!v.linked)?`<button class="btn sm" data-act="debt-part" data-id="${esc(x.id)}">دفع جزء</button>`:''}${v.linked&&v.paid?'':`<button class="btn sm soft" data-act="debt-toggle" data-id="${esc(x.id)}">${v.paid?'رجّع':'تم السداد'}</button>`}<button class="btn sm danger" data-act="debt-del" data-id="${esc(x.id)}">حذف</button></div>`).join('');
   return secBox('debts','الديون (لينا وعلينا)',`<div class="acts"><button class="btn sm" data-act="debt-new">+ دين</button></div>
    <div class="rows"><div class="row"><span>فلوس لينا عند ناس</span><span class="good">${money(forMe)}</span></div><div class="row"><span>فلوس علينا لناس</span><span class="crit">${money(onMe)}</span></div>${isAdmin?`<div class="row"><span>رصيد المكان الحالي</span><span>${money(bal)}</span></div><div class="row total"><span>الوضع المالي الكلي</span><span class="${bal+forMe-onMe>=0?'good':'crit'}">${money(bal+forMe-onMe)}</span></div>`:''}</div>
    ${list?`<h3 style="margin-top:12px">القايمة</h3>${list}`:'<div class="hint" style="margin-top:8px">مفيش ديون متسجلة.</div>'}`);
@@ -2225,6 +2328,17 @@ function openDebt(){
     e.preventDefault(); const amt=num($('#db-amt').value), who=$('#db-who').value.trim(); if(!who||amt<=0){toast('اكتب الاسم والمبلغ');return}
     const items=[...slist('debts','items'),{id:uid(),who,amount:amt,dir:$('#db-dir').value,date:$('#db-date').value||today(),note:$('#db-note').value.trim(),paid:false,by:byWho()}];
     if(await ssave('debts',{items})){closeModal();toast('اتسجل')}
+  });
+}
+
+function openDebtPart(id){
+  const it=slist('debts','items').find(x=>x.id===id); if(!it)return; const v=Fin.debtView(it,[]);
+  S.modal={type:'debtpart',id};
+  showModal(sheetHtml('دفع جزء من الدين',`<form class="form" id="dpform"><div class="box"><div class="rows"><div class="row"><span>${esc(it.who||'—')}</span><span></span></div><div class="row total"><span>المتبقي</span><span>${money(v.left)}</span></div></div></div>${field('المبلغ اللي اتدفع (ج)','<input id="dp-amt" type="number" inputmode="decimal" step="any" min="0" required>')}<button class="btn" type="submit" style="width:100%;padding:14px">تسجيل الدفعة</button></form>`));
+  $('#dpform').addEventListener('submit',async e=>{
+    e.preventDefault(); const a=num($('#dp-amt').value); if(a<=0){toast('اكتب مبلغ صحيح');return}
+    const nx=Fin.addDebtPayment(it,a,today(),byWho()); if(!nx){toast('اكتب مبلغ صحيح');return}
+    if(await ssave('debts',{items:slist('debts','items').map(x=>x.id===id?nx:x)})){closeModal();toast('اتسجلت الدفعة ✓')}
   });
 }
 
@@ -2318,12 +2432,12 @@ function renderMoneyExtra(){
 function openMonthReport(){
   const R=monthRangeOf(S.ref); S.modal={type:'report'};
   const done=devs().filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
-  const revenue=done.reduce((s,d)=>s+num(d.price),0), costs=partsLoggedIn(R);
+  const revenue=done.reduce((s,d)=>s+num(d.price),0), costs=deliveredPartsCost(R);
   const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0), expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
   const net=revenue-costs-lossP-expP;
   const mv=slist('payroll','moves').filter(m=>inR(m.date,R)), mem=slist('payroll','members');
   const draws=mv.filter(m=>m.type==='draw').reduce((s,m)=>s+num(m.amount),0), pens=mv.filter(m=>m.type==='pen').reduce((s,m)=>s+num(m.amount),0), sal=mem.reduce((s,m)=>s+num(m.salary),0);
-  const open=slist('debts','items').filter(x=>!x.paid), forMe=open.filter(x=>x.dir==='for').reduce((s,x)=>s+num(x.amount),0), onMe=open.filter(x=>x.dir==='on').reduce((s,x)=>s+num(x.amount),0);
+  const dt=Fin.debtTotals(slist('debts','items'),devs()), forMe=dt.forMe, onMe=dt.onMe;
   const r=(l,v,c)=>`<div class="row"><span>${l}</span><span class="${c||''}">${v}</span></div>`;
   showModal(`<div class="sheet" role="dialog" aria-modal="true"><div class="hd noprint"><h2>تقرير الشهر</h2><button class="x" data-act="close" aria-label="إغلاق">✕</button></div>
    <div class="receipt" dir="rtl"><div class="rh"><b>${esc(settings().centerName||'تقرير المركز')}</b><span>${esc(monthLabel(S.ref))}</span></div>
@@ -2367,7 +2481,9 @@ document.addEventListener('click',async e=>{
       const left=num(dv.price)-paidOf(dv);
       if(left>0.0001){const pay={id:'y'+Date.now().toString(36),amount:left,method:'نقدي',receivedBy:'',holder:DRAWER,date:today(),by:byWho()}; if(!(await devPatch(dv.id,{payments:[...(dv.payments||[]),pay]})))return;}
     }
-    await ssave('debts',{items:slist('debts','items').map(x=>x.id===id?{...x,paid:!x.paid}:x)});return}
+    if(!it.devId&&!it.paid){const nx=Fin.addDebtPayment(it,Fin.debtView(it,[]).left,today(),byWho());await ssave('debts',{items:slist('debts','items').map(x=>x.id===id?(nx||{...x,paid:true}):x)});return}
+    await ssave('debts',{items:slist('debts','items').map(x=>x.id===id?{...x,paid:!x.paid,payments:x.paid?[]:x.payments}:x)});return}
+  if(act==='debt-part')return openDebtPart(id);
   if(act==='debt-del'){armConfirm(b,async()=>{const x=slist('debts','items').find(z=>z.id===id)||{}; if(await ssave('debts',{items:slist('debts','items').filter(z=>z.id!==id)}))audit('حذف دين',(x.who||'')+' · '+fmt(x.amount)+' ج')});return}
   if(act==='tool-new')return openTool(null);
   if(act==='tool-open')return openTool(id);
@@ -3204,7 +3320,7 @@ function renderDash(){
   let adm='';
   if(isAdmin){
     const doneToday=groupDevs('out');
-    const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-partsLoggedIn({from:t,to:t});
+    const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-deliveredPartsCost({from:t,to:t});
     const collectedT=ds.reduce((s,d)=>s+(d.payments||[]).filter(p=>p.date===t).reduce((a,p)=>a+num(p.amount),0),0);
     const expT=cache.expenses.filter(e=>e.date===t).reduce((s,e)=>s+num(e.amount),0);
     const row=(l,v,c)=>`<div class="row"><span>${l}</span><span class="${c||''}">${v}</span></div>`;
@@ -3579,7 +3695,7 @@ function renderMoney(){
   const R=range();
   const done=devs().filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
   const revenue=done.reduce((s,d)=>s+num(d.price),0);
-  const costs=partsLoggedIn(R);
+  const costs=deliveredPartsCost(R);
   const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0);
   const expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
   const net=revenue-costs-lossP-expP;
@@ -3587,7 +3703,7 @@ function renderMoney(){
   const collected=devs().reduce((s,d)=>s+(d.payments||[]).filter(p=>inR(p.date,R)).reduce((a,p)=>a+num(p.amount),0),0);
   $('#report').innerHTML=`<div class="box"><h2>${esc(R.label)}</h2><div class="rows">
     <div class="row"><span>إيراد ${devicesWord(done.length)} اتسلموا</span><span>${money(revenue)}</span></div>
-    <div class="row"><span>قطع الغيار والشحن (اللي اتسجلت في الفترة)</span><span class="crit">− ${money(costs)}</span></div>
+    <div class="row"><span>تكلفة قطع الأجهزة اللي اتسلمت</span><span class="crit">− ${money(costs)}</span></div>
     <div class="row"><span>خسائر صيانة</span><span class="crit">− ${money(lossP)}</span></div>
     <div class="row"><span>المصروفات</span><span class="crit">− ${money(expP)}</span></div>
     <div class="row total"><span>صافي الربح</span><span class="${net>=0?'good':'crit'}">${money(net)}</span></div>
@@ -3637,7 +3753,7 @@ function openExpense(){
 function reportText(){
   const R=range(), created=d=>d.createdAt?iso(new Date(d.createdAt)):d.entryDate;
   const ds=devs(), entered=ds.filter(d=>inR(created(d),R)).length, done=ds.filter(d=>d.status==='done'&&inR(d.deliveredAt,R));
-  const revenue=done.reduce((s,d)=>s+num(d.price),0), costs=partsLoggedIn(R);
+  const revenue=done.reduce((s,d)=>s+num(d.price),0), costs=deliveredPartsCost(R);
   const lossP=cache.losses.filter(l=>inR(l.date,R)).reduce((s,l)=>s+num(l.amount),0), expP=cache.expenses.filter(e=>inR(e.date,R)).reduce((s,e)=>s+num(e.amount),0);
   const collected=ds.reduce((s,d)=>s+(d.payments||[]).filter(p=>inR(p.date,R)).reduce((a,p)=>a+num(p.amount),0),0);
   const inspect=ds.filter(d=>d.status==='check').length, partW=ds.filter(d=>d.status==='part').length, readyN=ds.filter(d=>d.status==='ready'||d.status==='hold').length;
@@ -3960,7 +4076,7 @@ renderDash = function(){
   let adm='';
   if(isAdmin){
     const doneToday=groupDevs('out');
-    const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-partsLoggedIn({from:t,to:t});
+    const profit=doneToday.reduce((s,d)=>s+num(d.price),0)-deliveredPartsCost({from:t,to:t});
     const collectedT=ds.reduce((s,d)=>s+(d.payments||[]).filter(p=>p.date===t).reduce((a,p)=>a+num(p.amount),0),0);
     const expT=cache.expenses.filter(e=>e.date===t).reduce((s,e)=>s+num(e.amount),0);
     const row=(l,v,c)=>`<div class="row"><span>${l}</span><span class="${c||''}">${v}</span></div>`;
