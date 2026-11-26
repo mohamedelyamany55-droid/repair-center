@@ -1317,6 +1317,96 @@ const Fin=(function(){var module=undefined;var self={};/* حسابات الفل�
 });
 
 return self.Fin;})();
+const Att=(function(){var module=undefined;var self={};/* حسابات الحضور: ميعاد الشغل، رصيد السماح، الأوفر تايم، الإذن. دوال صافية للاختبار. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Att = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  var ALLOW_DEFAULT = 120; // دقيقة في الشهر
+
+  // '13:00' -> 780 (دقايق من أول اليوم). قيمة غلط -> null
+  function parseHM(s) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '').trim());
+    if (!m) return null;
+    var h = +m[1], mi = +m[2];
+    return (h > 23 || mi > 59) ? null : h * 60 + mi;
+  }
+  function minsOf(ts) { var d = new Date(ts); return d.getHours() * 60 + d.getMinutes(); }
+
+  function byDay(recs, month) {
+    var days = {};
+    (recs || []).forEach(function (r) {
+      if (!r || !r.date || String(r.date).indexOf(month) !== 0) return;
+      (days[r.date] = days[r.date] || []).push(r);
+    });
+    Object.keys(days).forEach(function (k) { days[k].sort(function (a, b) { return a.ts - b.ts; }); });
+    return days;
+  }
+
+  // recs = كل تسجيلات شخص واحد. shift = {start:'13:00', end:'23:00'} أو فاضي
+  function monthReport(recs, shift, month, allowance) {
+    var allow = allowance == null ? ALLOW_DEFAULT : allowance;
+    var st = shift ? parseHM(shift.start) : null, en = shift ? parseHM(shift.end) : null;
+    var days = byDay(recs, month), list = [];
+    var t = { days: 0, workedMin: 0, lateMin: 0, excusedLateMin: 0, earlyMin: 0, excusedEarlyMin: 0,
+      overtimeMin: 0, openDays: 0, errandMin: 0 };
+
+    Object.keys(days).sort().forEach(function (date) {
+      var rs = days[date];
+      var ins = rs.filter(function (r) { return r.kind === 'in'; });
+      var outs = rs.filter(function (r) { return r.kind === 'out'; });
+      if (!ins.length) return;
+      var d = { date: date, inTs: ins[0].ts, outTs: null, workedMin: 0, lateMin: 0, lateExcused: false,
+        earlyMin: 0, earlyExcused: false, overtimeMin: 0, open: false, errandMin: 0, reason: '' };
+      // ساعات الشغل: أزواج حضور → انصراف بالترتيب
+      var openAt = null;
+      rs.forEach(function (r) {
+        if (r.kind === 'in' && openAt == null) openAt = r.ts;
+        else if (r.kind === 'out' && openAt != null) { d.workedMin += Math.round((r.ts - openAt) / 6e4); openAt = null; }
+      });
+      d.open = openAt != null;
+      if (outs.length) d.outTs = outs[outs.length - 1].ts;
+      var permIn = rs.filter(function (r) { return r.kind === 'perm_in' && r.ts <= ins[0].ts; })[0];
+      var permOut = rs.filter(function (r) { return r.kind === 'perm_out' && d.outTs && r.ts <= d.outTs; })[0];
+      if (permIn) {
+        d.errandMin = Math.max(0, Math.round((ins[0].ts - permIn.ts) / 6e4));
+        d.reason = permIn.reason || '';
+      }
+      if (st != null) {
+        var late = minsOf(ins[0].ts) - st;
+        if (late > 0) { d.lateMin = late; d.lateExcused = !!permIn; }
+      }
+      if (en != null && d.outTs) {
+        var o = minsOf(d.outTs) - en;
+        if (o > 0) d.overtimeMin = o;
+        else if (o < 0) { d.earlyMin = -o; d.earlyExcused = !!permOut; }
+      }
+      t.days++; t.workedMin += d.workedMin; t.overtimeMin += d.overtimeMin; t.errandMin += d.errandMin;
+      if (d.open) t.openDays++;
+      if (d.lateMin) { if (d.lateExcused) t.excusedLateMin += d.lateMin; else t.lateMin += d.lateMin; }
+      if (d.earlyMin) { if (d.earlyExcused) t.excusedEarlyMin += d.earlyMin; else t.earlyMin += d.earlyMin; }
+      list.push(d);
+    });
+
+    t.allowance = allow;
+    t.allowanceUsedMin = Math.min(t.lateMin, allow);
+    t.allowanceLeftMin = Math.max(0, allow - t.lateMin);
+    t.deductMin = Math.max(0, t.lateMin - allow);
+    t.list = list;
+    return t;
+  }
+
+  // 135 -> "2 س 15 د"
+  function fmtMin(m) {
+    m = Math.max(0, Math.round(m || 0));
+    var h = Math.floor(m / 60), r = m % 60;
+    return h ? h + ' س ' + (r < 10 ? '0' : '') + r + ' د' : r + ' د';
+  }
+  return { parseHM: parseHM, monthReport: monthReport, fmtMin: fmtMin, ALLOW_DEFAULT: ALLOW_DEFAULT };
+});
+
+return self.Att;})();
 const settings=()=>cache.settings.find(x=>x.id==='main')||{};
 const finSettings=()=>cache.fin_settings.find(x=>x.id==='main')||{};
 const alertDays=()=>{const n=Number(settings().alertDays);return n>0?n:7};
@@ -1830,6 +1920,7 @@ function renderSettings(){
     <div class="hint">أسماء التيم بتظهر كاقتراحات في المستلم والفني وصاحب المحفظة. التيم يقدر يفتح الأجهزة والمخزون، والحسابات والإعدادات ليك بس.</div>
     <button class="btn" type="submit">حفظ الإعدادات</button></form></div>
   ${appearanceHtml()}<div class="box"><h2>نسخة احتياطية</h2><div class="hint" style="margin-bottom:10px">نزّل نسخة من البيانات على جهازك وخليها في مكان آمن (مرة كل شهر على الأقل). الملف الكامل للاحتياط، وملف الأجهزة بيفتح في إكسيل.</div><div class="acts"><button class="btn soft" data-act="backup-json">نسخة كاملة (JSON)</button><button class="btn soft" data-act="backup-csv">الأجهزة (Excel)</button></div></div>`+usersHtml()+auditHtml();
+  if(!canWipe()){const rb=document.querySelector('[data-act="reset-open"]'); if(rb&&rb.closest('.box'))rb.closest('.box').remove()}
   $('#setform').addEventListener('submit',async e=>{e.preventDefault();
     const days=Math.max(1,Math.round(num($('#s-days').value))||7);
     const team=$('#s-team').value.split('\n').map(x=>x.trim()).filter(Boolean);
@@ -2967,6 +3058,8 @@ document.addEventListener('change',e=>{if(e.target.id==='att-date'){S.attDate=e.
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]'); if(!b)return; const a=b.dataset.act;
   if(a==='att-go'){attAct(b);return}
+  if(a==='perm-open'){openPerm(b.dataset.k);return}
+  if(a==='shift-save'){saveShifts();return}
   if(a==='att-reg'){b.disabled=true; await fpRegister(); renderAtt(); return}
   if(a==='att-del'){armConfirm(b,()=>safe(()=>remove('attendance',b.dataset.id)));return}
   if(a==='att-here'){
@@ -3543,8 +3636,11 @@ function distCls(dist,rad){rad=rad||100; return dist<=rad*.6?'d-ok':dist<=rad?'d
 function attRowHtml(r,admin){
   const rad=Number(attSet().radius)||100;
   const dist=(isAdmin&&r.dist!=null)?`<span class="dist ${distCls(r.dist,rad)}">${r.dist} م</span>`:'';
-  const lbl=r.kind==='reject'?'<span class="qual" style="color:var(--crit)">اترفض</span>':`<span class="qual">${r.kind==='in'?'حضور':'انصراف'}</span>`;
-  return `<div class="item"><div class="t"><b>${esc(r.name||'—')}</b> ${lbl}${dist}<div>${dshow(r.date)} · ${hm(r.ts)}${r.manual?' · يدوي'+(r.note?' ('+esc(r.note)+')':''):''}${r.kind==='reject'&&isAdmin?' · بعيد عن المركز':''}</div></div>${admin?`<button class="btn sm danger" data-act="att-del" data-id="${esc(r.id)}">حذف</button>`:''}</div>`;
+  const KL={in:'حضور',out:'انصراف',perm_in:'إذن حضور',perm_out:'إذن انصراف'};
+  const lbl=r.kind==='reject'?'<span class="qual" style="color:var(--crit)">اترفض</span>':`<span class="qual">${KL[r.kind]||'—'}</span>`;
+  const why=r.reason?` · ${esc(r.reason)}`:'';
+  const loc=(isAdmin&&r.lat!=null&&r.lng!=null&&isFinite(Number(r.lat))&&isFinite(Number(r.lng)))?` · <a href="https://maps.google.com/?q=${Number(r.lat)},${Number(r.lng)}" target="_blank" rel="noopener">📍 الموقع</a>`:((r.kind==='perm_in'||r.kind==='perm_out')&&isAdmin?' · المكان مش متاح':'');
+  return `<div class="item"><div class="t"><b>${esc(r.name||'—')}</b> ${lbl}${dist}<div>${dshow(r.date)} · ${hm(r.ts)}${why}${loc}${r.manual?' · يدوي'+(r.note?' ('+esc(r.note)+')':''):''}${r.kind==='reject'&&isAdmin?' · بعيد عن المركز':''}</div></div>${admin?`<button class="btn sm danger" data-act="att-del" data-id="${esc(r.id)}">حذف</button>`:''}</div>`;
 }
 const clockParts=()=>{const d=new Date(); let h=d.getHours(); const ap=h>=12?'PM':'AM'; h=h%12||12; return {t:pad(h)+':'+pad(d.getMinutes()),s:pad(d.getSeconds()),ap,date:d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}};
 function workedText(){
@@ -3557,6 +3653,44 @@ setInterval(()=>{
   c.innerHTML=p.t+'<small>'+p.ap+'</small>'; const w=document.getElementById('clkw'); if(w)w.textContent=workedText();
   const dd=document.getElementById('clkd'); if(dd)dd.textContent=p.date;
 },1000);
+
+/* ---------- مواعيد الفنيين + كشف الشهر + الإذن ---------- */
+const shiftMap=()=>((cache.settings.find(x=>x.id==='shifts')||{}).map)||{};
+function attPlanHtml(ppl,month){
+  const sm=shiftMap();
+  const rows=ppl.map(p=>{const s=sm[p.id]||{};
+    return `<div class="item"><div class="t"><b>${esc(p.name)}</b></div><input class="search shf" type="time" data-uid="${esc(p.id)}" data-w="start" value="${esc(s.start||'')}" style="flex:none;width:96px"><input class="search shf" type="time" data-uid="${esc(p.id)}" data-w="end" value="${esc(s.end||'')}" style="flex:none;width:96px"></div>`}).join('');
+  const rep=ppl.map(p=>{
+    const r=Att.monthReport(cache.attendance.filter(x=>x.uid===p.id),sm[p.id],month,Att.ALLOW_DEFAULT), f=Att.fmtMin;
+    if(!r.days)return `<div class="item"><div class="t"><b>${esc(p.name)}</b><div>مفيش حضور في الشهر ده</div></div></div>`;
+    return `<div class="item"><div class="t"><b>${esc(p.name)}</b><div>${r.days} يوم · شغل فعلي ${f(r.workedMin)}${r.openDays?` · <span class="crit">${r.openDays} يوم من غير انصراف</span>`:''}</div>
+      <div>تأخير ${f(r.lateMin)} · سماح باقي ${f(r.allowanceLeftMin)} من ${f(r.allowance)}${r.deductMin?` · <span class="crit">خصم ${f(r.deductMin)}</span>`:''}</div>
+      <div>أوفر تايم ${f(r.overtimeMin)} · انصراف بدري ${f(r.earlyMin)}${r.excusedLateMin||r.excusedEarlyMin||r.errandMin?` · بإذن: تأخير ${f(r.excusedLateMin)}، انصراف ${f(r.excusedEarlyMin)}، مشاوير ${f(r.errandMin)}`:''}</div></div></div>`}).join('');
+  return `<div class="box"><h2>مواعيد الشغل</h2><div class="hint" style="margin-bottom:8px">من (يمين) إلى (شمال) لكل فني. سيب الخانتين فاضيتين لو مفيش ميعاد. رصيد السماح ${Att.fmtMin(Att.ALLOW_DEFAULT)} في الشهر.</div>${rows}<button class="btn" data-act="shift-save" style="width:100%;margin-top:8px">حفظ المواعيد</button></div>
+   <div class="box"><div class="head"><h2 style="margin:0">كشف الشهر</h2><input class="search" id="att-month" type="month" value="${esc(month)}" style="flex:none"></div>${rep}</div>`;
+}
+async function saveShifts(){
+  const map={}; let bad=false;
+  document.querySelectorAll('.shf').forEach(i=>{ const u=i.dataset.uid, w=i.dataset.w; if(!i.value)return; if(Att.parseHM(i.value)==null){bad=true;return} (map[u]=map[u]||{})[w]=i.value; });
+  if(bad){toast('وقت غلط');return}
+  for(const u in map){ if(!map[u].start||!map[u].end){toast('اكتب البداية والنهاية للفني ده أو سيب الاتنين فاضيين');return} }
+  if(await safe(()=>put('settings','shifts',{map})))toast('اتحفظت المواعيد');
+}
+function openPerm(kind){
+  if(kind!=='perm_in'&&kind!=='perm_out')return;
+  S.modal={type:'perm',kind};
+  showModal(sheetHtml(kind==='perm_in'?'إذن حضور':'إذن انصراف',`<form class="form" id="permform">${field('السبب (مثال: عند التاجر فلان - شراء شاشة)','<input id="pm-reason" required maxlength="120" autocomplete="off">')}<div class="hint">هيتسجل الوقت ومكانك دلوقتي.</div><button class="btn" type="submit" style="width:100%;padding:14px">تسجيل الإذن</button></form>`));
+  $('#permform').addEventListener('submit',async e=>{
+    e.preventDefault(); const reason=$('#pm-reason').value.trim().slice(0,120); if(!reason){toast('اكتب السبب');return}
+    const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
+    let pos=null; try{pos=await getPos()}catch(x){pos=null}
+    const uid=session.user.id, now=Date.now(), rec={uid,name:myMemberName(),kind,ts:now,date:iso(new Date(now)),reason};
+    if(pos){rec.lat=pos.coords.latitude;rec.lng=pos.coords.longitude;rec.acc=Math.round(pos.coords.accuracy||0)}
+    if(await safe(()=>put('attendance',newId(),rec))){closeModal();toast(pos?'اتسجل الإذن '+hm(now):'اتسجل الإذن '+hm(now)+' (المكان مش متاح)',4000)}
+    else btn.disabled=false;
+  });
+}
+document.addEventListener('change',e=>{if(e.target.id==='att-month'&&/^\d{4}-\d{2}$/.test(e.target.value)){S.attMonth=e.target.value;renderAtt()}});
 function renderAtt(){
   const box=$('#attBox'); if(!box)return;
   const ae=document.activeElement; if(ae&&box.contains(ae)&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))return;
@@ -3568,6 +3702,7 @@ function renderAtt(){
     ${!s.lat?'<div class="hint" style="margin-top:8px">الأدمن لسه ما حددش موقع المركز.</div>':''}
     <button class="btn attbtn ${kind==='out'?'out':''}" id="att-go" data-act="att-go" ${dis}>${kind==='in'?'حضور<small>Check In</small>':kind==='out'?'انصراف<small>Check Out</small>':'تم حضورك وانصرافك النهاردة ✓'}</button></div>
     <div class="box daycard"><span>📅 أيام حضورك الشهر ده</span><b>${sm.days}</b></div>
+    <div class="acts" style="margin:8px 0"><button class="btn soft" data-act="perm-open" data-k="perm_in">إذن حضور</button><button class="btn soft" data-act="perm-open" data-k="perm_out">إذن انصراف</button></div>
     ${mine.length?`<div class="box"><h3>تسجيلات النهاردة</h3>${mine.map(r=>attRowHtml(r,false)).join('')}</div>`:''}`;
   if(isAdmin){
     const dsel=S.attDate||today0;
@@ -3575,6 +3710,7 @@ function renderAtt(){
     const ppl=[{id:uid,name:myMemberName()+' (أنا)'},...cache.members.filter(m=>m.approved&&!m.disabled).map(m=>({id:m.id,name:m.name||m.email}))];
     const sums=ppl.map(p=>({p,s:attSummary(p.id,month)}));
     h+=`<div class="box"><h2>ملخص الشهر</h2>${sums.map(x=>`<div class="item"><div class="t"><b>${esc(x.p.name)}</b><div>${x.s.days} يوم · ${hrs(x.s.hours)}${x.s.open?' · <span class="crit">لسه ما سجلش انصراف</span>':''}</div></div></div>`).join('')}</div>
+     ${attPlanHtml(ppl,S.attMonth||month)}
      <div class="box"><div class="head"><h2 style="margin:0">سجل اليوم</h2><input class="search" id="att-date" type="date" value="${dsel}" style="flex:none"></div>
       <div class="hint" style="margin-bottom:6px">الرقم جنب الاسم هو المسافة من المركز: <span class="dist d-ok">قريب</span> <span class="dist d-near">على الحد</span> <span class="dist d-far">بعيد</span></div>
       ${dayRecs.length?dayRecs.map(r=>attRowHtml(r,true)).join(''):'<div class="hint">مفيش تسجيلات في اليوم ده.</div>'}</div>
@@ -3614,8 +3750,15 @@ async function confirmIdentity(){
 async function attAct(btn){
   const s=attSet();
   if(!s.lat||!s.lng){toast('الأدمن لسه ما حددش موقع المركز');return}
-  const uid=session.user.id, kind=nextKind(uid);
-  if(kind==='done'){toast('سجّلت حضورك وانصرافك النهاردة',4000);return}
+  const uid=session.user.id; let kind=nextKind(uid);
+  btn.disabled=true;
+  try{ /* نجيب تسجيلاتك من السيرفر الأول، عشان موبايل قديم الداتا ما يسجلش حضور تاني */
+    const y=iso(new Date(Date.now()-864e5));
+    const rows=await http('/rest/v1/docs?select=collection,id,data&collection=eq.attendance&data-%3E%3Euid=eq.'+encodeURIComponent(uid)+'&data-%3E%3Edate=gte.'+y+'&limit=200');
+    (rows||[]).forEach(applyRow);
+  }catch(e){ btn.disabled=false; toast('النت ضعيف ومقدرتش أتأكد من تسجيلاتك. جرّب تاني',5000); return }
+  const kind2=nextKind(uid); if(kind2!==kind){kind=kind2; renderAtt();}
+  if(kind==='done'){btn.disabled=false; toast('سجّلت حضورك وانصرافك النهاردة',4000);return}
   btn.disabled=true; const old=btn.innerHTML; btn.textContent='...';
   try{
     let pos; try{pos=await getPos()}catch(e){toast(e&&e.code===1?'اسمح للمتصفح بالوصول للموقع':'مقدرتش أحدد موقعك، اتأكد إن الـ GPS شغال وجرب تاني',6000);return}
@@ -3915,6 +4058,7 @@ function renderSettings(){
   <button class="btn soft" data-act="guide-open" style="width:100%;margin-bottom:12px">📖 دليل المستخدم</button>
   ${appearanceHtml()}<div class="box"><h2>نسخة احتياطية</h2><div class="hint" style="margin-bottom:10px">نزّل نسخة من البيانات على جهازك وخليها في مكان آمن (البرنامج هيفكرك أول كل شهر). الملف الكامل للاحتياط، وملف الأجهزة بيفتح في إكسيل.</div><div class="acts"><button class="btn soft" data-act="backup-json">نسخة كاملة (JSON)</button><button class="btn soft" data-act="backup-csv">الأجهزة (Excel)</button></div></div>`+usersHtml()+auditHtml()+
   `<div class="box"><h2>الوضع الافتراضي للبرنامج</h2><div class="hint" style="margin-bottom:10px">بيمسح كل بيانات البرنامج نهائيًا ويرجّعه فاضي. الحسابات المسجلة بتفضل.</div><button class="btn danger" data-act="reset-open" style="width:100%">الوضع الافتراضي للبرنامج</button></div>`;
+  if(!canWipe()){const rb=document.querySelector('[data-act="reset-open"]'); if(rb&&rb.closest('.box'))rb.closest('.box').remove()}
   $('#setform').addEventListener('submit',async e=>{e.preventDefault();
     const days=Math.max(1,Math.round(num($('#s-days').value))||7);
     const team=$('#s-team').value.split('\n').map(x=>x.trim()).filter(Boolean);
@@ -3925,11 +4069,14 @@ function renderSettings(){
     const ok2=await safe(()=>put('fin_settings','main',{opening:num($('#s-open').value)}));
     if(ok1&&ok2)toast('اتحفظت الإعدادات');});
 }
+const canWipe=()=>{const m=cache.members.find(x=>x.id===(session&&session.user&&session.user.id)); return !(m&&m.noWipe)};
 function openReset(){
+  if(!canWipe()){toast('مفيش صلاحية للعملية دي');return}
   S.modal={type:'reset'};
   showModal(sheetHtml('⚠️ الوضع الافتراضي للبرنامج',`<div class="box"><b>هتمسح قاعدة بيانات البرنامج بالكامل وترجّعه للوضع الافتراضي.</b><div class="hint" style="margin-top:6px">كل الأجهزة والمخزون والحسابات والحضور هتتمسح ومش هترجع. الحسابات المسجلة بتفضل.</div></div><div class="acts"><button class="btn danger" data-act="reset-go" style="flex:1">موافق، امسح</button><button class="btn soft" data-act="close" style="flex:1">إلغاء</button></div>`));
 }
 async function doReset(){
+  if(!canWipe()){toast('مفيش صلاحية للعملية دي');return}
   const skip=new Set(['members','creds']);
   try{
     for(const c of COLS){ if(skip.has(c))continue; await http('/rest/v1/docs?collection=eq.'+encodeURIComponent(c),{method:'DELETE',headers:{Prefer:'return=minimal'}}); }
